@@ -1,0 +1,4940 @@
+# ==================================================================
+# !!! WARNING: Use VPN otherwise they ask you for Browser-Cookie !!!
+# ==================================================================
+
+
+#+--------------------------------------+
+#|                                      |
+#|    Youtube - Meta_data extract       |
+#|                                      |
+#+--------------------------------------+
+
+#┌──────────────────┐
+#│                  │
+#│      Video       │
+#│   Information    │
+#│                  │
+#└──────────────────┘
+
+#yt-format				#Show video formats
+
+#yt-date-title				#'date' + 'time' of video
+#yt-range-date-title-link               #'date' + 'title' + 'link' of video (Date range wise)
+#yt-date-time-title			#'date' + 'time' + 'title' of video
+#yt-links_only				#playlist link extract
+
+#┌──────────────────┐
+#│                  │
+#│       Tags       │
+#│                  │
+#└──────────────────┘
+
+#yt-tags				#Tags extract from video
+
+#┌──────────────────┐
+#│                  │
+#│      Owner       │
+#│                  │
+#└──────────────────┘
+
+#yt-which-youtuber			#Youtuber name extract from their link
+
+
+
+
+#+--------------------------------------+
+#|                                      |
+#|               Donwload               |
+#|                                      |
+#+--------------------------------------+
+
+#yt-audio			#Audio download
+#yt-video			#Video download
+#yt-transcript			#Transcript download
+
+
+
+#+--------------------------------------+
+#|                                      |
+#|                 JSON                 |
+#|                                      |
+#+--------------------------------------+
+
+
+#┌──────────────────┐
+#│                  │
+#│   Online JSON    │
+#│                  │
+#└──────────────────┘
+
+#yt-chapter			#(normal) video & chapters =>  start | end | total time | Chapter name
+#yt-chapter-sort		#(sort)   video & chapters =>  start | end | total time | Chapter name
+
+
+
+#┌──────────────────┐
+#│                  │
+#│   Before JSON    │
+#│                  │
+#└──────────────────┘
+
+#yt-comment-download		#Download youtube comments
+#yt-comment-count		#Count the comments
+
+
+
+#┌──────────────────┐
+#│                  │
+#│    After JSON    │
+#│                  │
+#└──────────────────┘
+
+#yt-json-username			#JSON data se username niklna
+#yt-json-username_name_count		#Count of words starting with any character or letter
+#yt-json-chapter			#start time | end time | total time | chapter name
+
+
+
+
+#+--------------------------------------+
+#|                                      |
+#|        Special functionality         |
+#|                                      |
+#+--------------------------------------+
+#yt-youtuber-full_length		#youtuber ki saareee videos kitney [year : months : hours : minute : seconds] ki hai jaana ho to
+
+
+
+#+----------------------------+
+#|                            |
+#|         live chat          |
+#|                            |
+#+----------------------------+
+#yt-live-chat				#Youtube-live ki chat extract
+#yt-analysis				#Unn .txt chat se particulars ki chat extract
+
+###################################################################################################
+
+
+#yt-format
+yt-format() {
+    [[ $# -eq 0 ]] && { echo "URL empty hai"; return 1; }
+
+    local inputs=()
+    for arg in "$@"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line; do
+                [[ -n "$line" ]] && inputs+=("$line")
+            done < "$arg"
+        else
+            inputs+=("$arg")
+        fi
+    done
+
+    for url in "${inputs[@]}"; do
+        title=$(yt-dlp --get-title "$url" 2>/dev/null)
+        [[ -z "$title" ]] && { echo "Title fetch nahi hua, URL check karo: $url"; continue; }
+
+        echo ""
+        echo "-------------------------------------------------------------------------"
+        echo ""
+        echo "$title"
+        echo ""
+        echo "-------------------------------------------------------------------------"
+        echo ""
+
+        yt-dlp -F "$url" 2>/dev/null
+    done
+}
+
+
+
+
+
+
+
+
+
+
+
+
+#yt-date-title
+yt-date-title () 
+{ 
+    if [[ $# -eq 0 ]]; then
+        cat <<'EOF'
+Usage: yt-date-title <input> [input2 ...]
+
+Kya kya input de sakte ho:
+  1. Single video URL
+       yt-date-title "https://www.youtube.com/watch?v=XXXX"
+
+  2. Multiple URLs ek saath
+       yt-date-title "url1" "url2" "url3"
+
+  3. Playlist URL (saare videos ki list aayegi)
+       yt-date-title "https://www.youtube.com/playlist?list=PLxxxx"
+
+  4. Channel URL (channel ke saare videos)
+       yt-date-title "https://www.youtube.com/@channelname/videos"
+
+  5. Text file (har line me ek URL)
+       yt-date-title urls.txt
+
+  6. File + URLs mix
+       yt-date-title urls.txt "https://youtu.be/YYYY"
+
+Output format:
+  DD-MM-YYYY  Video Title
+
+Tips:
+  - Output file me save karne ke liye:  yt-date-title urls.txt > output.txt
+  - Khaali lines file me skip ho jaati hain
+  - Fail hone wale URLs (private/deleted) kuch print nahi karte
+EOF
+        return 1
+    fi
+
+    local inputs=()
+    for arg in "$@"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line; do
+                line="${line%$'\r'}"
+                [[ -n "$line" ]] && inputs+=("$line")
+            done < "$arg"
+        else
+            inputs+=("$arg")
+        fi
+    done
+
+    for url in "${inputs[@]}"; do
+        yt-dlp --skip-download --print "%(upload_date>%d-%m-%Y)s  %(title)s" "$url" 2> /dev/null
+    done
+}
+
+
+
+
+
+
+
+
+
+
+#yt-range-date-title-link
+yt-range-date-title-link () 
+{ 
+    local start_raw="" end_raw="" interactive=0
+    local -a args=() inputs=()
+    local arg line url typed
+
+    _yrdtl_help() {
+        cat <<'EOF'
+Usage:
+  yt-range-date-title-link -s DDMMYYYY -e DDMMYYYY <input> [input2 ...]
+  yt-range-date-title-link <input> ...       (dates prompt se poochega)
+  yt-range-date-title-link -i                (URL aur dates dono prompt se)
+
+Options:
+  -s, --start DDMMYYYY   Starting date (inclusive)
+  -e, --end   DDMMYYYY   Ending date (inclusive)
+  -i, --interactive      URL(s) prompt par paste karo
+  -h, --help             Ye help
+
+Input kya kya ho sakta hai:
+  1. Single video URL
+  2. Multiple URLs
+  3. Playlist URL
+  4. Channel URL (https://www.youtube.com/@name/videos)
+  5. Text file (har line me ek URL, # wali line skip)
+  6. File + URLs mix
+
+Example:
+  yt-range-date-title-link -s 01012026 -e 31122026 https://youtube.com/playlist?list=PLxxx&si=yyy
+
+Date 01-01-2026 ya 01/01/2026 likhne par bhi chalegi.
+
+Output format:
+  (DD-MM-YYYY)  Video Title - https://youtu.be/VIDEO_ID
+EOF
+    }
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help) _yrdtl_help; unset -f _yrdtl_help; return 0 ;;
+            -s|--start)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad date do" >&2; unset -f _yrdtl_help; return 1; }
+                start_raw="$2"; shift 2 ;;
+            -e|--end)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad date do" >&2; unset -f _yrdtl_help; return 1; }
+                end_raw="$2"; shift 2 ;;
+            -i|--interactive) interactive=1; shift ;;
+            --) shift; args+=("$@"); break ;;
+            *) args+=("$1"); shift ;;
+        esac
+    done
+
+    if [[ ${#args[@]} -eq 0 && $interactive -eq 0 ]]; then
+        _yrdtl_help; unset -f _yrdtl_help; return 0
+    fi
+    unset -f _yrdtl_help
+
+    if [[ $interactive -eq 1 || -z "$start_raw" || -z "$end_raw" ]]; then
+        local pg tpg
+        pg=$(ps -o pgid= -p "$BASHPID" 2>/dev/null | tr -d ' ')
+        tpg=$(ps -o tpgid= -p "$BASHPID" 2>/dev/null | tr -d ' ')
+        if [[ ! -t 0 || ( -n "$pg" && -n "$tpg" && "$pg" != "$tpg" ) ]]; then
+            echo "Error: yahan prompt nahi pooch sakta. Dates saath me do:" >&2
+            echo "  yt-range-date-title-link -s DDMMYYYY -e DDMMYYYY \"<URL>\"" >&2
+            return 1
+        fi
+    fi
+
+    if [[ $interactive -eq 1 ]]; then
+        local -a typed_arr
+        read -r -p "URL(s) paste karo: " typed
+        read -r -a typed_arr <<< "$typed"
+        args+=("${typed_arr[@]}")
+    fi
+
+    if [[ ${#args[@]} -eq 0 ]]; then
+        echo "Error: koi URL/file nahi diya" >&2
+        return 1
+    fi
+
+    [[ -z "$start_raw" ]] && read -r -p "Starting date (DDMMYYYY): " start_raw
+    [[ -z "$end_raw" ]] && read -r -p "Ending date (DDMMYYYY): " end_raw
+
+    start_raw="${start_raw//[^0-9]/}"
+    end_raw="${end_raw//[^0-9]/}"
+
+    if [[ ${#start_raw} -ne 8 || ${#end_raw} -ne 8 ]]; then
+        echo "Error: date 8 digit DDMMYYYY me do (example: 01012026)" >&2
+        return 1
+    fi
+
+    local start_date="${start_raw:4:4}${start_raw:2:2}${start_raw:0:2}"
+    local end_date="${end_raw:4:4}${end_raw:2:2}${end_raw:0:2}"
+
+    if [[ "$(date -d "$start_date" +%Y%m%d 2>/dev/null)" != "$start_date" ]]; then
+        echo "Error: Starting date valid nahi hai" >&2; return 1
+    fi
+    if [[ "$(date -d "$end_date" +%Y%m%d 2>/dev/null)" != "$end_date" ]]; then
+        echo "Error: Ending date valid nahi hai" >&2; return 1
+    fi
+    if [[ "$start_date" > "$end_date" ]]; then
+        echo "Error: Starting date, Ending date se baad ki hai" >&2; return 1
+    fi
+
+    for arg in "${args[@]}"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                inputs+=("$line")
+            done < "$arg"
+        else
+            inputs+=("$arg")
+        fi
+    done
+
+    if [[ ${#inputs[@]} -eq 0 ]]; then
+        echo "Error: koi valid URL nahi mila" >&2
+        return 1
+    fi
+
+    local result
+    result=$(
+        for url in "${inputs[@]}"; do
+            yt-dlp \
+                --skip-download \
+                --no-warnings \
+                --dateafter "$start_date" \
+                --datebefore "$end_date" \
+                --extractor-args "youtube:skip=hls,dash" \
+                --print "(%(upload_date>%d-%m-%Y)s)  %(title)s - https://youtu.be/%(id)s" \
+                "$url" < /dev/null || echo "Failed: $url" >&2
+        done
+    )
+    [[ -n "$result" ]] && printf '%s\n' "$result"
+    return 0
+}
+
+# ---- Auto-setup (isi file ke source hote hi chalta hai) ----
+# Enter dabate hi, bash line parse karne se pehle, URL ko quotes me daal deta hai.
+# Isse & wale URL bina quotes ke bhi foreground me sahi chalte hain.
+if [[ $- == *i* ]]; then
+    set +m    # [1] 12345 aur "Done" wale job messages band
+
+    _yt_autoquote() {
+        case "$READLINE_LINE" in
+            "yt-range-date-title-link "*)
+                if [[ "$READLINE_LINE" != *[\'\"]* ]]; then
+                    READLINE_LINE=$(sed -E "s#(https?://[^ ]+)#'\1'#g" <<< "$READLINE_LINE")
+                    READLINE_POINT=${#READLINE_LINE}
+                fi
+                ;;
+        esac
+    }
+    bind -x '"\C-x\C-y": _yt_autoquote'
+    bind '"\C-m": "\C-x\C-y\C-j"'
+fi
+
+
+
+
+
+
+
+
+
+
+#yt-date-time-title
+yt-date-time-title () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-date-time-title <input> [input2 ...]
+
+Ye function video ki upload date + time (tumhare local time me) aur title nikalta hai.
+
+Kya kya input de sakte ho:
+  1. Single video URL
+       yt-date-time-title https://www.youtube.com/watch?v=XXXX
+
+  2. Multiple URLs ek saath
+       yt-date-time-title "url1" "url2" "url3"
+
+  3. Playlist URL (saare videos)
+       yt-date-time-title https://www.youtube.com/playlist?list=PLxxxx
+
+  4. Channel URL
+       yt-date-time-title https://www.youtube.com/@channelname/videos
+
+  5. Text file (har line me ek URL, # wali line skip)
+       yt-date-time-title urls.txt
+
+  6. File + URLs mix
+       yt-date-time-title urls.txt https://youtu.be/YYYY
+
+Output format:
+  DD-MM-YYYY HH:MM:SS  Video Title
+
+Tips:
+  - & wale URL bina quotes ke bhi chalega (auto-quote block .bashrc me ho to)
+  - File me save karne ke liye: yt-date-time-title urls.txt > output.txt
+  - Fail hone wale URL ke liye "Failed: <url>" dikhega
+EOF
+        return 0
+    fi
+
+    local arg line url out ts title
+    local -a inputs=()
+
+    for arg in "$@"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                inputs+=("$line")
+            done < "$arg"
+        else
+            inputs+=("$arg")
+        fi
+    done
+
+    if [[ ${#inputs[@]} -eq 0 ]]; then
+        echo "Error: koi valid URL nahi mila" >&2
+        return 1
+    fi
+
+    for url in "${inputs[@]}"; do
+        out=$(yt-dlp \
+            --skip-download \
+            --no-warnings \
+            --extractor-args "youtube:skip=hls,dash" \
+            --print "%(timestamp)s|%(title)s" \
+            "$url" < /dev/null 2>/dev/null)
+
+        if [[ -z "$out" ]]; then
+            echo "Failed: $url" >&2
+            continue
+        fi
+
+        while IFS= read -r line; do
+            ts="${line%%|*}"
+            title="${line#*|}"
+            ts="${ts%.*}"
+            if [[ "$ts" =~ ^[0-9]+$ ]]; then
+                printf '%s  %s\n' "$(date -d "@$ts" '+%d-%m-%Y %H:%M:%S')" "$title"
+            else
+                printf '%s  %s\n' "NA (time nahi mila)" "$title"
+            fi
+        done <<< "$out"
+    done
+    return 0
+}
+
+
+
+
+
+
+
+
+
+
+
+#yt-links_only
+yt-links_only () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-links_only [options] <input> [input2 ...]
+
+Ye function sirf playlist ya channel (ke section) ke saare links nikalta hai.
+Metadata/download nahi karta, isliye fast hai. Har link milte hi turant
+print hota hai, aur duplicate link sirf ek baar aata hai.
+
+Options:
+  -s, --section LIST   Channel ka kaunsa section chahiye (comma se alag karke
+                       multiple de sakte ho). Default: all
+  -h, --help           Ye help
+
+Sections:
+  all         videos + shorts + live (default)
+  videos      sirf Videos tab
+  shorts      sirf Shorts tab
+  live        sirf Live / streams tab
+  playlists   channel ki playlists ke links
+  courses     Courses tab
+  podcasts    Podcasts tab
+  releases    Releases tab
+
+Kya kya input de sakte ho:
+  1. Playlist URL
+       yt-links_only https://www.youtube.com/playlist?list=PLxxxx
+
+  2. Channel URL (saare videos + shorts + live)
+       yt-links_only https://www.youtube.com/@channelname
+
+  3. Channel ka particular section
+       yt-links_only -s videos https://www.youtube.com/@channelname
+       yt-links_only -s live https://www.youtube.com/@channelname
+       yt-links_only -s courses https://www.youtube.com/@channelname
+       yt-links_only -s videos,live https://www.youtube.com/@channelname
+
+  4. Section wala URL seedha (tab URL me hi section ho to wahi use hoga)
+       yt-links_only https://www.youtube.com/@channelname/videos
+
+  5. Multiple URLs ek saath
+       yt-links_only "url1" "url2" "url3"
+
+  6. Text file (har line me ek URL, # wali line skip)
+       yt-links_only urls.txt
+
+  7. File + URLs mix
+       yt-links_only -s videos urls.txt https://youtube.com/playlist?list=PLxxx
+
+Output format:
+  https://www.youtube.com/watch?v=VIDEO_ID   (har video ke liye ek line)
+
+Tips:
+  - File me save karne ke liye: yt-links_only -s videos URL > links.txt
+  - Single video ka link (watch?v=...) is function me skip hota hai
+  - Jo section channel me nahi hai (jaise courses), wo chup-chaap skip hota hai
+  - Fail hone wale URL ke liye "Failed: <url>" stderr me dikhega
+
+Note:
+  - Playlist section ki link dogey, to playlist ki link nikalega
+
+EOF
+        return 0
+    fi
+
+    local section="all" arg line url base tab link found sec
+    local -a opts=() inputs=() sections=()
+    local -A seen=()
+    local chan_re='^(https?://(www\.|m\.)?youtube\.com/(@[^/?#]+|channel/[^/?#]+|c/[^/?#]+|user/[^/?#]+))(/([a-z]+))?/?([?#].*)?$'
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -s|--section)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad section do" >&2; return 1; }
+                section="${2,,}"; shift 2 ;;
+            --) shift; opts+=("$@"); break ;;
+            -*) echo "Error: unknown option '$1' (-h se help dekho)" >&2; return 1 ;;
+            *)  opts+=("$1"); shift ;;
+        esac
+    done
+
+    command -v yt-dlp >/dev/null 2>&1 || { echo "Error: yt-dlp install nahi hai" >&2; return 1; }
+
+    # Section list validate karo
+    for sec in ${section//,/ }; do
+        case "$sec" in
+            all)            sections+=(videos shorts streams) ;;
+            videos|shorts|playlists|courses|podcasts|releases) sections+=("$sec") ;;
+            live|streams)   sections+=(streams) ;;
+            *) echo "Error: invalid section '$sec' (-h se list dekho)" >&2; return 1 ;;
+        esac
+    done
+
+    for arg in "${opts[@]}"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                inputs+=("$line")
+            done < "$arg"
+        else
+            inputs+=("$arg")
+        fi
+    done
+
+    if [[ ${#inputs[@]} -eq 0 ]]; then
+        echo "Error: koi valid URL nahi mila" >&2
+        return 1
+    fi
+
+    for url in "${inputs[@]}"; do
+        local -a targets=()
+        targets=()
+
+        if [[ "$url" == *"/playlist?"*list=* || ( "$url" == *list=* && "$url" != *"v="* ) ]]; then
+            # Playlist URL
+            targets+=("$url")
+        elif [[ "$url" =~ $chan_re ]]; then
+            base="${BASH_REMATCH[1]}"
+            tab="${BASH_REMATCH[5]}"
+            if [[ -n "$tab" ]]; then
+                # URL me section pehle se hai, wahi use karo
+                targets+=("$url")
+            else
+                for sec in "${sections[@]}"; do
+                    targets+=("$base/$sec")
+                done
+            fi
+        elif [[ "$url" == *"watch?v="* || "$url" == *youtu.be/* || "$url" == */shorts/* ]]; then
+            echo "Skip: ye video link hai, playlist/channel nahi: $url" >&2
+            continue
+        else
+            targets+=("$url")
+        fi
+
+        found=0
+        for link in "${targets[@]}"; do
+            while IFS= read -r line; do
+                [[ "$line" == http* ]] || continue
+                found=1
+                if [[ -z "${seen[$line]}" ]]; then
+                    seen[$line]=1
+                    printf '%s\n' "$line"
+                fi
+            done < <(PYTHONUNBUFFERED=1 yt-dlp \
+                        --flat-playlist \
+                        --no-warnings \
+                        --print "%(url)s" \
+                        "$link" < /dev/null 2>/dev/null)
+        done
+
+        [[ $found -eq 0 ]] && echo "Failed: $url" >&2
+    done
+    return 0
+}
+
+# ---- Auto-quote: kisi bhi command me unquoted URL (& ke saath) ko Enter par quote karta hai ----
+if [[ $- == *i* ]]; then
+    set +m
+    _yt_autoquote() {
+        if [[ "$READLINE_LINE" == *http*://*\&* && "$READLINE_LINE" != *[\'\"]* ]]; then
+            READLINE_LINE=$(sed -E "s#(https?://[^ ]+)#'\1'#g" <<< "$READLINE_LINE")
+            READLINE_POINT=${#READLINE_LINE}
+        fi
+    }
+    bind -x '"\C-x\C-y": _yt_autoquote'
+    bind '"\C-m": "\C-x\C-y\C-j"'
+fi
+
+
+
+
+
+
+
+
+
+
+#yt-tags
+yt-tags () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-tags <input> [input2 ...]
+
+Ye function video ka title aur uske tags nikalta hai.
+Playlist/channel me har video ka result milte hi turant dikhta hai.
+
+Kya kya input de sakte ho:
+  1. Single video URL
+       yt-tags https://www.youtube.com/watch?v=XXXX
+
+  2. Multiple URLs ek saath
+       yt-tags "url1" "url2" "url3"
+
+  3. Playlist URL (saare videos ke tags)
+       yt-tags https://www.youtube.com/playlist?list=PLxxxx
+
+  4. Channel URL
+       yt-tags https://www.youtube.com/@channelname/videos
+
+  5. Text file (har line me ek URL, # wali line skip)
+       yt-tags urls.txt
+
+  6. File + URLs mix
+       yt-tags urls.txt https://youtu.be/YYYY
+
+Output format:
+  Video Title
+  Tags : tag1, tag2, tag3
+  -----------------------------
+
+Tips:
+  - File me save karne ke liye: yt-tags urls.txt > output.txt
+  - Fail hone wale URL ke liye "Failed: <url>" dikhega
+EOF
+        return 0
+    fi
+
+    local arg line url title tags found
+    local -a inputs=()
+    local sep="-------------------------------------------------------------------------------------"
+
+    for arg in "$@"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                inputs+=("$line")
+            done < "$arg"
+        else
+            inputs+=("$arg")
+        fi
+    done
+
+    if [[ ${#inputs[@]} -eq 0 ]]; then
+        echo "Error: koi valid URL nahi mila" >&2
+        return 1
+    fi
+
+    for url in "${inputs[@]}"; do
+        found=0
+        # yt-dlp ka output line by line turant padhta hai (streaming)
+        while IFS= read -r title && IFS= read -r tags; do
+            found=1
+            [[ -z "$tags" || "$tags" == "NA" || "$tags" == "None" ]] && tags="No tags found"
+            printf '%s\nTags : %s\n\n%s\n' "$title" "$tags" "$sep"
+        done < <(PYTHONUNBUFFERED=1 yt-dlp \
+                    --skip-download \
+                    --no-warnings \
+                    --print "%(title)s" \
+                    --print "%(tags|)l" \
+                    "$url" < /dev/null 2>/dev/null)
+
+        [[ $found -eq 0 ]] && echo "Failed: $url" >&2
+    done
+    return 0
+}
+
+
+
+
+
+
+
+
+
+#yt-which-youtuber
+yt-which-youtuber () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-which-youtuber <input> [input2 ...]
+
+Ye function batata hai ki video/playlist kis YouTuber (username) ka hai.
+Same username sirf ek baar dikhta hai (duplicate nahi), aur naya
+username milte hi turant print hota hai.
+
+Kya kya input de sakte ho:
+  1. Single video URL
+       yt-which-youtuber https://www.youtube.com/watch?v=XXXX
+
+  2. Multiple URLs ek saath
+       yt-which-youtuber "url1" "url2" "url3"
+
+  3. Playlist URL (playlist ke saare unique YouTubers)
+       yt-which-youtuber https://www.youtube.com/playlist?list=PLxxxx
+
+  4. Channel URL
+       yt-which-youtuber https://www.youtube.com/@channelname/videos
+
+  5. Text file (har line me ek URL, # wali line skip)
+       yt-which-youtuber urls.txt
+
+  6. File + URLs mix
+       yt-which-youtuber urls.txt https://youtu.be/YYYY
+
+Output format:
+  @username
+
+Tips:
+  - File me save karne ke liye: yt-which-youtuber urls.txt > output.txt
+  - Fail hone wale URL ke liye "Failed: <url>" stderr me dikhega
+EOF
+        return 0
+    fi
+
+    local arg line url username found
+    local -a inputs=()
+    local -A seen=()
+
+    for arg in "$@"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                inputs+=("$line")
+            done < "$arg"
+        else
+            inputs+=("$arg")
+        fi
+    done
+
+    if [[ ${#inputs[@]} -eq 0 ]]; then
+        echo "Error: koi valid URL nahi mila" >&2
+        return 1
+    fi
+
+    for url in "${inputs[@]}"; do
+        found=0
+        while IFS= read -r username; do
+            [[ -z "$username" || "$username" == "NA" ]] && continue
+            found=1
+            if [[ -z "${seen[$username]}" ]]; then
+                seen[$username]=1
+                printf '%s\n' "$username"
+            fi
+        done < <(PYTHONUNBUFFERED=1 yt-dlp \
+                    --skip-download \
+                    --no-warnings \
+                    --print "%(uploader_id,channel_id,uploader|NA)s" \
+                    "$url" < /dev/null 2>/dev/null)
+
+        [[ $found -eq 0 ]] && echo "Failed: $url" >&2
+    done
+    return 0
+}
+
+# ---- Auto-quote: kisi bhi command me unquoted URL (& ke saath) ko Enter par quote karta hai ----
+if [[ $- == *i* ]]; then
+    set +m
+    _yt_autoquote() {
+        if [[ "$READLINE_LINE" == *http*://*\&* && "$READLINE_LINE" != *[\'\"]* ]]; then
+            READLINE_LINE=$(sed -E "s#(https?://[^ ]+)#'\1'#g" <<< "$READLINE_LINE")
+            READLINE_POINT=${#READLINE_LINE}
+        fi
+    }
+    bind -x '"\C-x\C-y": _yt_autoquote'
+    bind '"\C-m": "\C-x\C-y\C-j"'
+fi
+
+
+
+
+
+
+
+
+
+#yt-audio
+yt-audio () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-audio [options] <input> [input2 ...]
+
+Ye function video/playlist se audio nikaal kar MP3 (192K) me save karta hai.
+
+Options:
+  -y, --folders      Folders banao (Channel/Playlist/Title.mp3), prompt nahi poochega
+  -n, --no-folders   Folder mat banao (sab files current folder me), prompt nahi poochega
+  -h, --help         Ye help
+  (koi option na do to "Create folders? (Y/n)" poochega)
+
+Kya kya input de sakte ho:
+  1. Single video URL
+       yt-audio https://www.youtube.com/watch?v=XXXX
+
+  2. Multiple URLs ek saath
+       yt-audio "url1" "url2" "url3"
+
+  3. Playlist URL (saari playlist ki audio)
+       yt-audio https://www.youtube.com/playlist?list=PLxxxx
+
+  4. Channel URL
+       yt-audio https://www.youtube.com/@channelname/videos
+
+  5. Text file (har line me ek URL, # wali line skip)
+       yt-audio urls.txt
+
+  6. File + URLs mix
+       yt-audio -n urls.txt https://youtu.be/YYYY
+
+Folder structure (folders = Yes):
+  Channel Name/Playlist Name/Title.mp3
+  Channel Name/Title.mp3            (single video ke liye)
+
+Zaruri tools: yt-dlp, ffmpeg  (aria2c ho to fast download)
+
+Tips:
+  - Fail hone wale URL ke liye "Failed: <url>" dikhega
+  - Jo file pehle se downloaded hai, dobara download nahi hoti
+EOF
+        return 0
+    fi
+
+    local choice="" arg line url rc=0
+    local -a urls=() opts=() dl_opts=()
+    local output_template
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -y|--folders)    choice="Y"; shift ;;
+            -n|--no-folders) choice="N"; shift ;;
+            --) shift; opts+=("$@"); break ;;
+            -*) echo "Error: unknown option '$1' (-h se help dekho)" >&2; return 1 ;;
+            *)  opts+=("$1"); shift ;;
+        esac
+    done
+
+    command -v yt-dlp >/dev/null 2>&1 || { echo "Error: yt-dlp install nahi hai" >&2; return 1; }
+    command -v ffmpeg >/dev/null 2>&1 || { echo "Error: ffmpeg install nahi hai (MP3 conversion ke liye zaruri)" >&2; return 1; }
+
+    for arg in "${opts[@]}"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                urls+=("$line")
+            done < "$arg"
+        else
+            urls+=("$arg")
+        fi
+    done
+
+    if [[ ${#urls[@]} -eq 0 ]]; then
+        echo "Error: koi valid URL nahi mila" >&2
+        return 1
+    fi
+
+    if [[ -z "$choice" ]]; then
+        if [[ -t 0 ]]; then
+            read -r -p "Create folders? (Y/n): " choice
+        fi
+        choice="${choice:-Y}"
+    fi
+
+    if [[ "$choice" =~ ^[Nn] ]]; then
+        output_template="%(title).200B.%(ext)s"
+    else
+        output_template="%(uploader,channel|Unknown Channel)s/%(playlist_title&{}/|)s%(title).200B.%(ext)s"
+    fi
+
+    if command -v aria2c >/dev/null 2>&1; then
+        dl_opts=(--downloader aria2c --downloader-args "aria2c:-x 16 -k 1M -j 8")
+    fi
+
+    yt-dlp \
+        -f "bestaudio[ext=m4a]/bestaudio/best" \
+        --extract-audio --audio-format mp3 --audio-quality 192K \
+        --yes-playlist --no-overwrites --ignore-errors \
+        --newline --progress \
+        --progress-template "%(info.title)s | %(progress._percent_str)s | %(progress._speed_str)s | ETA %(progress._eta_str)s" \
+        -o "$output_template" -N 8 \
+        "${dl_opts[@]}" --no-warnings \
+        -- "${urls[@]}" < /dev/null
+    rc=$?
+
+    if [[ $rc -ne 0 ]]; then
+        echo "Warning: kuch URL/video fail hue (exit code $rc)" >&2
+    fi
+    return $rc
+}
+
+# ---- Auto-quote: kisi bhi command me unquoted URL (& ke saath) ko Enter par quote karta hai ----
+if [[ $- == *i* ]]; then
+    set +m
+    _yt_autoquote() {
+        if [[ "$READLINE_LINE" == *http*://*\&* && "$READLINE_LINE" != *[\'\"]* ]]; then
+            READLINE_LINE=$(sed -E "s#(https?://[^ ]+)#'\1'#g" <<< "$READLINE_LINE")
+            READLINE_POINT=${#READLINE_LINE}
+        fi
+    }
+    bind -x '"\C-x\C-y": _yt_autoquote'
+    bind '"\C-m": "\C-x\C-y\C-j"'
+fi
+
+
+
+
+
+
+
+
+
+
+#yt-video
+yt-video () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-video [options] <input> [input2 ...]
+
+Video/playlist ko MP4 me download karta hai (quality tum chuno).
+Fail hone par apne aap 5 alag tareeke try karta hai (alag player client,
+dheeme requests, simple format, region header). Quality na mile to neeche wali.
+
+Options:
+  -q, --quality Q    Quality: 1|480, 2|720, 3|1080, 4|best (na do to menu se poochega)
+  -d, --dir DIR      Is folder me download (nahi hai to ban jayega)
+  -p, --playlist-folder
+                     Channel/Playlist/ folder structure me save karega
+  -c, --cookies B    Browser ki cookies use karo (brave, chrome, firefox, edge...)
+                     Bot check / age-restricted / private video ke liye sabse kaargar
+  -C, --cookie-file F  cookies.txt file use karo
+  -x, --proxy URL    Proxy (jaise socks5://127.0.0.1:1080), geo-block ke liye
+  -r, --retries N    Har URL ke liye max tareeke (1-5, default 5)
+  -h, --help         Ye help
+
+Input:
+  Single URL, multiple URLs, playlist, channel, text file (har line me URL, # skip)
+
+Examples:
+  yt-video -q 1080 -d ~/Videos https://youtu.be/XXXX
+  yt-video -q best -p -c brave "https://youtube.com/playlist?list=PLxxx"
+
+Tips:
+  - "Sign in to confirm you're not a bot" aaye to -c brave (ya chrome/firefox) lagao,
+    us browser me YouTube login hona chahiye
+  - Hamesha yt-dlp update rakho: yt-dlp -U
+  - Naye YouTube ke liye JavaScript runtime (deno ya node) install hona behtar hai
+  - Geo-block (country restricted) ke liye VPN ya -x proxy hi asli hal hai
+  - Jo file pehle se hai dobara download nahi hoti, Ctrl+C ke baad dobara chalao to resume
+EOF
+        return 0
+    fi
+
+    local quality="" outdir="" folders=0 arg line rc=0 h fmt fmt2 template
+    local cookies="" cfile="" proxy="" maxtry=5 i url arch failc=0 okc=0 interrupted=0
+    local vre='(youtu\.be/|[?&]v=|/shorts/|/live/|/embed/)'
+    local -a opts=() urls=() base=() ck=() extra=() failed=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -q|--quality)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad quality do" >&2; return 1; }
+                quality="$2"; shift 2 ;;
+            -d|--dir)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad folder do" >&2; return 1; }
+                outdir="$2"; shift 2 ;;
+            -p|--playlist-folder) folders=1; shift ;;
+            -c|--cookies)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad browser ka naam do" >&2; return 1; }
+                cookies="$2"; shift 2 ;;
+            -C|--cookie-file)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad file do" >&2; return 1; }
+                [[ -f "$2" ]] || { echo "Error: cookie file nahi mili: $2" >&2; return 1; }
+                cfile="$2"; shift 2 ;;
+            -x|--proxy)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad proxy URL do" >&2; return 1; }
+                proxy="$2"; shift 2 ;;
+            -r|--retries)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad number do" >&2; return 1; }
+                [[ "$2" =~ ^[1-5]$ ]] || { echo "Error: -r 1 se 5 ke beech ho" >&2; return 1; }
+                maxtry="$2"; shift 2 ;;
+            --) shift; opts+=("$@"); break ;;
+            -*) echo "Error: unknown option '$1' (-h se help dekho)" >&2; return 1 ;;
+            *)  opts+=("$1"); shift ;;
+        esac
+    done
+
+    command -v yt-dlp >/dev/null 2>&1 || { echo "Error: yt-dlp install nahi hai" >&2; return 1; }
+    command -v ffmpeg >/dev/null 2>&1 || { echo "Error: ffmpeg install nahi hai (merge ke liye zaruri)" >&2; return 1; }
+
+    for arg in "${opts[@]}"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                urls+=("$line")
+            done < "$arg"
+        else
+            urls+=("$arg")
+        fi
+    done
+
+    if [[ ${#urls[@]} -eq 0 ]]; then
+        echo "Error: koi valid URL nahi mila" >&2
+        return 1
+    fi
+
+    if [[ -z "$quality" ]]; then
+        if [[ ! -t 0 ]]; then
+            echo "Error: prompt nahi pooch sakta. -q 720 jaisa option do." >&2
+            return 1
+        fi
+        while true; do
+            echo "Select Quality:"
+            echo "1) Medium (480p)"
+            echo "2) High (720p)"
+            echo "3) HD (1080p)"
+            echo "4) Ultra HD (best available)"
+            read -r -p "Enter option [1-4] (Enter = 4): " quality
+            quality="${quality:-4}"
+            case "${quality,,}" in
+                1|2|3|4|480|480p|720|720p|1080|1080p|best|max) break ;;
+                *) echo "Galat option, 1 se 4 ke beech chuno." >&2 ;;
+            esac
+        done
+    fi
+    case "${quality,,}" in
+        1|480|480p)   h=480 ;;
+        2|720|720p)   h=720 ;;
+        3|1080|1080p) h=1080 ;;
+        4|best|max)   h="" ;;
+        *) echo "Error: invalid quality '$quality'" >&2; return 1 ;;
+    esac
+
+    # Quality na mile to neeche wali, phir koi bhi best
+    if [[ -n "$h" ]]; then
+        fmt="bv*[height<=$h]+ba/b[height<=$h]/bv*+ba/b"
+        fmt2="b[height<=$h]/b"
+    else
+        fmt="bv*+ba/b"
+        fmt2="b"
+    fi
+
+    if [[ $folders -eq 1 ]]; then
+        template="%(uploader,channel|Unknown Channel)s/%(playlist_title&{}/|)s%(title).200B.%(ext)s"
+    else
+        template="%(title).200B.%(ext)s"
+    fi
+    if [[ -n "$outdir" ]]; then
+        mkdir -p -- "$outdir" || { echo "Error: folder ban nahi paaya: $outdir" >&2; return 1; }
+        template="$outdir/$template"
+    fi
+
+    [[ -n "$cookies" ]] && ck=(--cookies-from-browser "$cookies")
+    [[ -n "$cfile" ]] && ck=(--cookies "$cfile")
+    [[ -n "$proxy" ]] && ck+=(--proxy "$proxy")
+
+    base=(--merge-output-format mp4 --concurrent-fragments 5 --no-overwrites --ignore-errors
+          --no-warnings --newline --retries 10 --fragment-retries 10 --extractor-retries 5
+          --file-access-retries 5 --socket-timeout 30 --retry-sleep 3
+          -o "$template")
+
+    trap 'interrupted=1' INT
+    echo "Starting download... (quality: ${h:+${h}p, kam ho to neeche wali}${h:-best})"
+
+    for url in "${urls[@]}"; do
+        (( interrupted )) && break
+        echo "Processing: $url"
+        # Archive: retry me jo video ho chuka wo dobara nahi hota, sirf fail wale hote hain
+        arch=$(mktemp) || arch=""
+        rc=1
+        for (( i = 0; i < maxtry; i++ )); do
+            case $i in
+                0) extra=(-f "$fmt") ;;
+                1) extra=(-f "$fmt" --extractor-args "youtube:player_client=tv,web_safari,mweb") ;;
+                2) extra=(-f "$fmt" --extractor-args "youtube:player_client=android_vr,web_embedded" \
+                          --sleep-requests 1 --sleep-interval 1 --max-sleep-interval 3) ;;
+                3) extra=(-f "$fmt2" --extractor-args "youtube:player_client=default,mweb" \
+                          --sleep-requests 1 --sleep-interval 2 --max-sleep-interval 5) ;;
+                4) extra=(-f "$fmt2" --xff US --force-ipv4 \
+                          --sleep-requests 2 --sleep-interval 3 --max-sleep-interval 8) ;;
+            esac
+            (( i > 0 )) && echo "Retry $i/$(( maxtry - 1 )): doosre tareeke se try ho raha hai..."
+            if [[ -n "$arch" ]]; then
+                yt-dlp "${base[@]}" "${ck[@]}" "${extra[@]}" --download-archive "$arch" -- "$url" < /dev/null
+            else
+                yt-dlp "${base[@]}" "${ck[@]}" "${extra[@]}" -- "$url" < /dev/null
+            fi
+            rc=$?
+            (( rc == 0 )) && break
+            (( interrupted || rc >= 128 )) && { interrupted=1; break; }
+        done
+        [[ -n "$arch" ]] && rm -f -- "$arch"
+        if (( rc == 0 )); then
+            okc=$(( okc + 1 ))
+        elif (( ! interrupted )); then
+            failc=$(( failc + 1 ))
+            failed+=("$url")
+            echo "Failed: $url (exit code $rc)" >&2
+        fi
+    done
+
+    trap - INT
+    echo
+    echo "Download complete: $okc | Failed: $failc"
+    if (( failc > 0 )); then
+        echo "Failed URLs:" >&2
+        printf '  %s\n' "${failed[@]}" >&2
+        if [[ -z "$cookies" && -z "$cfile" ]]; then
+            echo "Tip: bot check / sign-in error ho to dobara chalao: yt-video -c brave ..." >&2
+        fi
+        echo "Tip: yt-dlp -U se update karo. Country restricted ho to VPN ya -x proxy chahiye." >&2
+    fi
+    (( interrupted )) && return 130
+    (( failc == 0 ))
+}
+
+
+
+
+
+
+
+#yt-transcript
+yt-transcript () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-transcript [options] <input> [input2 ...]
+
+Ye function video ka title, owner, link aur transcript (subtitles) nikalta hai.
+Har video ka result milte hi turant dikhta hai.
+
+Options:
+  -f, --file FILE    URLs wali file (har line me ek URL, # wali line skip)
+  -l, --lang LANGS   Subtitle language, priority order me (default: en,hi)
+  -h, --help         Ye help
+
+Kya kya input de sakte ho:
+  1. Single video URL
+       yt-transcript https://www.youtube.com/watch?v=XXXX
+  2. Multiple URLs ek saath
+       yt-transcript "url1" "url2" "url3"
+  3. Playlist URL (har video ka transcript)
+       yt-transcript https://www.youtube.com/playlist?list=PLxxxx
+  4. Channel URL
+       yt-transcript https://www.youtube.com/@channelname/videos
+  5. Text file
+       yt-transcript -f urls.txt   (ya seedha: yt-transcript urls.txt)
+  6. File + URLs mix
+       yt-transcript -f urls.txt https://youtu.be/YYYY
+
+Examples:
+  yt-transcript -l hi,en https://youtu.be/XXXX
+  yt-transcript -f urls.txt > transcripts.txt
+
+Output format:
+  video title : ...
+  owner       : ...
+  link        : ...
+
+  <transcript text>
+  ---------------------
+
+Tips:
+  - Subtitles na mile to video ka description dikhta hai (clearly mark ke saath)
+  - Fail hone wale URL ke liye "Failed: <url>" stderr me aata hai
+EOF
+        return 0
+    fi
+
+    local lang="en,hi" arg line url vurl l tmpdir subfile title uploader info body
+    local first=1 found
+    local -a opts=() inputs=() videos=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -f|--file)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad file do" >&2; return 1; }
+                [[ -f "$2" ]] || { echo "Error: file nahi mili: $2" >&2; return 1; }
+                opts+=("$2"); shift 2 ;;
+            -l|--lang)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad language do" >&2; return 1; }
+                lang="$2"; shift 2 ;;
+            --) shift; opts+=("$@"); break ;;
+            -*) echo "Error: unknown option '$1' (-h se help dekho)" >&2; return 1 ;;
+            *)  opts+=("$1"); shift ;;
+        esac
+    done
+
+    command -v yt-dlp >/dev/null 2>&1 || { echo "Error: yt-dlp install nahi hai" >&2; return 1; }
+
+    for arg in "${opts[@]}"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                inputs+=("$line")
+            done < "$arg"
+        else
+            inputs+=("$arg")
+        fi
+    done
+
+    if [[ ${#inputs[@]} -eq 0 ]]; then
+        echo "Error: koi valid URL nahi mila" >&2
+        return 1
+    fi
+
+    # Playlist/channel ko alag-alag video URLs me todo
+    for url in "${inputs[@]}"; do
+        if [[ ( "$url" == *list=* && "$url" != *v=* ) || "$url" == */playlist* || "$url" == */@* \
+              || "$url" == */channel/* || "$url" == */c/* || "$url" == */user/* ]]; then
+            found=0
+            while IFS= read -r vurl; do
+                [[ -z "$vurl" || "$vurl" == "NA" ]] && continue
+                found=1
+                videos+=("$vurl")
+            done < <(yt-dlp --flat-playlist --no-warnings \
+                        --print "%(webpage_url,url)s" "$url" < /dev/null 2>/dev/null)
+            [[ $found -eq 0 ]] && echo "Failed: $url" >&2
+        else
+            videos+=("$url")
+        fi
+    done
+
+    if [[ ${#videos[@]} -eq 0 ]]; then
+        echo "Error: koi video nahi mila" >&2
+        return 1
+    fi
+
+    tmpdir=$(mktemp -d) || { echo "Error: temp folder nahi ban paaya" >&2; return 1; }
+    trap 'rm -rf "$tmpdir"; trap - INT; return 130' INT
+
+    for url in "${videos[@]}"; do
+        rm -f "$tmpdir"/sub* 2>/dev/null
+
+        info=$(yt-dlp --no-warnings --skip-download \
+                  --print "%(title)s|||%(uploader,channel|NA)s" \
+                  "$url" < /dev/null 2>/dev/null | head -1)
+        if [[ -z "$info" ]]; then
+            echo "Failed: $url" >&2
+            continue
+        fi
+        title="${info%%|||*}"
+        uploader="${info##*|||}"
+        [[ "$uploader" == "NA" ]] && uploader=""
+
+        yt-dlp --write-subs --write-auto-subs \
+               --sub-langs "$lang" \
+               --sub-format "vtt/best" --convert-subs vtt \
+               --skip-download --no-warnings --no-playlist \
+               -o "$tmpdir/sub" \
+               "$url" < /dev/null &>/dev/null
+
+        # Language priority ke hisaab se file chuno
+        subfile=""
+        for l in ${lang//,/ }; do
+            subfile=$(find "$tmpdir" -maxdepth 1 \( -name "*.$l.vtt" -o -name "*.$l-*.vtt" \) 2>/dev/null | head -1)
+            [[ -n "$subfile" ]] && break
+        done
+        [[ -z "$subfile" ]] && subfile=$(find "$tmpdir" -maxdepth 1 -name "*.vtt" 2>/dev/null | head -1)
+
+        if [[ -n "$subfile" ]]; then
+            body=$(grep -vE '^(WEBVTT|Kind:|Language:|NOTE)' "$subfile" \
+                | grep -v -- '-->' \
+                | sed -e 's/<[^>]*>//g' \
+                      -e 's/&nbsp;/ /g; s/&lt;/</g; s/&gt;/>/g; s/&amp;/\&/g' \
+                      -e 's/^[[:space:]]*//; s/[[:space:]]*$//' \
+                | awk 'NF && $0 != prev { print } { prev = $0 }' \
+                | tr '\n' ' ' | sed 's/  */ /g')
+        else
+            body=$(yt-dlp --no-warnings --skip-download --no-playlist \
+                      --print "%(description)s" "$url" < /dev/null 2>/dev/null)
+            if [[ -z "$body" || "$body" == "NA" ]]; then
+                body="[Subtitles available nahi hain]"
+            else
+                body="[Subtitles nahi mile, video ka description:] $body"
+            fi
+        fi
+
+        [[ $first -eq 0 ]] && printf '\n---------------------\n\n'
+        first=0
+        printf 'video title : %s\n' "${title:-(unavailable)}"
+        printf 'owner       : %s\n' "${uploader:-(unavailable)}"
+        printf 'link        : %s\n\n' "$url"
+        printf '%s\n' "$body"
+    done
+
+    rm -rf "$tmpdir"
+    trap - INT
+    return 0
+}
+
+# ---- Auto-quote: kisi bhi command me unquoted URL (& ke saath) ko Enter par quote karta hai ----
+if [[ $- == *i* ]]; then
+    set +m
+    _yt_autoquote() {
+        if [[ "$READLINE_LINE" == *http*://*\&* && "$READLINE_LINE" != *[\'\"]* ]]; then
+            READLINE_LINE=$(sed -E "s#(https?://[^ ]+)#'\1'#g" <<< "$READLINE_LINE")
+            READLINE_POINT=${#READLINE_LINE}
+        fi
+    }
+    bind -x '"\C-x\C-y": _yt_autoquote'
+    bind '"\C-m": "\C-x\C-y\C-j"'
+fi
+
+
+
+
+
+
+
+
+
+
+#yt-chapter
+yt-chapter () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-chapter <input> [input2 ...]
+
+Ye function video ke chapters (start, end, total duration, title) table me dikhata hai.
+Playlist/channel me har video ka result milte hi turant dikhta hai.
+Har video ke output ke beech 5 line ka gap aata hai.
+
+Kya kya input de sakte ho:
+  1. Single video URL
+       yt-chapter https://www.youtube.com/watch?v=XXXX
+  2. Multiple URLs ek saath
+       yt-chapter "url1" "url2" "url3"
+  3. Playlist URL (har video ke chapters)
+       yt-chapter https://www.youtube.com/playlist?list=PLxxxx
+  4. Channel URL
+       yt-chapter https://www.youtube.com/@channelname/videos
+  5. Text file (har line me ek URL, # wali line skip)
+       yt-chapter urls.txt
+  6. File + URLs mix
+       yt-chapter urls.txt https://youtu.be/YYYY
+
+Output format:
+  Processing: Video Title
+  Link: https://youtu.be/VIDEO_ID
+  START     END       TOTAL   CHAPTER
+  00:00:00  00:02:10  2m10s   Intro
+
+Zaruri tools: yt-dlp, jq (column optional)
+
+Tips:
+  - Jis video me chapters nahi hote, "Chapters nahi hain" likha aata hai
+  - File me save karne ke liye: yt-chapter urls.txt > chapters.txt
+  - Fail hone wale URL ke liye "Failed: <url>" stderr me dikhega
+EOF
+        return 0
+    fi
+
+    command -v yt-dlp >/dev/null 2>&1 || { echo "Error: yt-dlp install nahi hai" >&2; return 1; }
+    command -v jq >/dev/null 2>&1 || { echo "Error: jq install nahi hai" >&2; return 1; }
+
+    local gap=5          # ek video aur doosre video ke beech kitni khaali lines
+    local arg line url json title vid n found i
+    local -a inputs=()
+    local jq_prog='
+        def p2: tostring | if length < 2 then "0" + . else . end;
+        def hms: round as $t
+            | ($t / 3600 | floor) as $h
+            | (($t % 3600) / 60 | floor) as $m
+            | ($t % 60) as $s
+            | "\($h|p2):\($m|p2):\($s|p2)";
+        def dur: round as $t
+            | ($t / 3600 | floor) as $h
+            | (($t % 3600) / 60 | floor) as $m
+            | ($t % 60) as $s
+            | if $t <= 0 then "0s"
+              else (if $h > 0 then "\($h)h" else "" end)
+                 + (if $m > 0 then "\($m)m" else "" end)
+                 + (if $s > 0 then "\($s)s" else "" end) end;
+        ( ["START","END","TOTAL","CHAPTER"],
+          ["-----","---","-----","-------"],
+          ( .chapters[]
+            | (.start_time // 0) as $st
+            | (.end_time // $st) as $en
+            | [ ($st|hms), ($en|hms), (($en - $st)|dur),
+                ((.title // "") | gsub("[\t\n\r]"; " ")) ] )
+        ) | @tsv'
+
+    for arg in "$@"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                inputs+=("$line")
+            done < "$arg"
+        else
+            inputs+=("$arg")
+        fi
+    done
+
+    if [[ ${#inputs[@]} -eq 0 ]]; then
+        echo "Error: koi valid URL nahi mila" >&2
+        return 1
+    fi
+
+    for url in "${inputs[@]}"; do
+        found=0
+        while IFS= read -r json; do
+            [[ -z "$json" ]] && continue
+            found=1
+            title=$(jq -r '.title // "Unknown"' <<< "$json")
+            vid=$(jq -r '.id // ""' <<< "$json")
+            n=$(jq -r '(.chapters // []) | length' <<< "$json")
+
+            echo "Processing: $title"
+            echo "Link: https://youtu.be/$vid"
+            echo "----------------------------------------"
+            if [[ "$n" -gt 0 ]]; then
+                if command -v column >/dev/null 2>&1; then
+                    jq -r "$jq_prog" <<< "$json" | column -t -s $'\t'
+                else
+                    jq -r "$jq_prog" <<< "$json"
+                fi
+            else
+                echo "Chapters nahi hain"
+            fi
+
+            # Video ke baad 5 khaali lines ka gap
+            for (( i = 0; i < gap; i++ )); do echo ""; done
+        done < <(PYTHONUNBUFFERED=1 yt-dlp -j --skip-download --no-warnings --ignore-errors \
+                    "$url" < /dev/null 2>/dev/null | jq -c --unbuffered '{id, title, chapters}' 2>/dev/null)
+
+        [[ $found -eq 0 ]] && echo "Failed: $url" >&2
+    done
+    return 0
+}
+
+
+
+
+
+
+
+
+
+
+#yt-chapter-sort
+yt-chapter-sort () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-chapter-sort [options] <input> [input2 ...]
+
+Ye function video ke chapters ko DURATION ke hisaab se sort karke table me dikhata hai
+(start, end, total duration, title). Playlist/channel me har video ka result
+milte hi turant dikhta hai. Har video ke output ke beech 5 line ka gap aata hai.
+
+Options:
+  -r, --reverse   Sabse bada chapter pehle (default: sabse chhota pehle)
+  -h, --help      Ye help
+
+Kya kya input de sakte ho:
+  1. Single video URL
+       yt-chapter-sort https://www.youtube.com/watch?v=XXXX
+  2. Multiple URLs ek saath
+       yt-chapter-sort "url1" "url2" "url3"
+  3. Playlist URL (har video ke chapters)
+       yt-chapter-sort https://www.youtube.com/playlist?list=PLxxxx
+  4. Channel URL
+       yt-chapter-sort https://www.youtube.com/@channelname/videos
+  5. Text file (har line me ek URL, # wali line skip)
+       yt-chapter-sort urls.txt
+  6. File + URLs mix
+       yt-chapter-sort -r urls.txt https://youtu.be/YYYY
+
+Output format:
+  Processing: Video Title
+  Link: https://youtu.be/VIDEO_ID
+  START     END       TOTAL   CHAPTER
+  00:00:00  00:02:10  2m10s   Intro
+
+Zaruri tools: yt-dlp, jq (column optional)
+
+Tips:
+  - Jis video me chapters nahi hote, "Chapters nahi hain" likha aata hai
+  - File me save karne ke liye: yt-chapter-sort urls.txt > chapters.txt
+  - Fail hone wale URL ke liye "Failed: <url>" stderr me dikhega
+EOF
+        return 0
+    fi
+
+    local gap=5          # ek video aur doosre video ke beech kitni khaali lines
+    local reverse=0 arg line url json title vid n found i
+    local -a opts=() inputs=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -r|--reverse) reverse=1; shift ;;
+            --) shift; opts+=("$@"); break ;;
+            -*) echo "Error: unknown option '$1' (-h se help dekho)" >&2; return 1 ;;
+            *)  opts+=("$1"); shift ;;
+        esac
+    done
+
+    command -v yt-dlp >/dev/null 2>&1 || { echo "Error: yt-dlp install nahi hai" >&2; return 1; }
+    command -v jq >/dev/null 2>&1 || { echo "Error: jq install nahi hai" >&2; return 1; }
+
+    local sort_dir="asc"
+    [[ $reverse -eq 1 ]] && sort_dir="desc"
+
+    # Chapters ko duration ke hisaab se sort karke table banata hai
+    local jq_prog='
+        def p2: tostring | if length < 2 then "0" + . else . end;
+        def hms: round as $t
+            | ($t / 3600 | floor) as $h
+            | (($t % 3600) / 60 | floor) as $m
+            | ($t % 60) as $s
+            | "\($h|p2):\($m|p2):\($s|p2)";
+        def dur: round as $t
+            | ($t / 3600 | floor) as $h
+            | (($t % 3600) / 60 | floor) as $m
+            | ($t % 60) as $s
+            | if $t <= 0 then "0s"
+              else (if $h > 0 then "\($h)h" else "" end)
+                 + (if $m > 0 then "\($m)m" else "" end)
+                 + (if $s > 0 then "\($s)s" else "" end) end;
+        [ .chapters[]
+          | (.start_time // 0) as $st
+          | (.end_time // $st) as $en
+          | { st: $st, en: $en, d: ($en - $st), t: ((.title // "") | gsub("[\t\n\r]"; " ")) } ]
+        | sort_by(.d, .st)
+        | (if $dir == "desc" then reverse else . end) as $rows
+        | ( ["START","END","TOTAL","CHAPTER"],
+            ["-----","---","-----","-------"],
+            ( $rows[] | [ (.st|hms), (.en|hms), (.d|dur), .t ] )
+          ) | @tsv'
+
+    for arg in "${opts[@]}"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                inputs+=("$line")
+            done < "$arg"
+        else
+            inputs+=("$arg")
+        fi
+    done
+
+    if [[ ${#inputs[@]} -eq 0 ]]; then
+        echo "Error: koi valid URL nahi mila" >&2
+        return 1
+    fi
+
+    for url in "${inputs[@]}"; do
+        found=0
+        while IFS= read -r json; do
+            [[ -z "$json" ]] && continue
+            found=1
+            title=$(jq -r '.title // "Unknown"' <<< "$json")
+            vid=$(jq -r '.id // ""' <<< "$json")
+            n=$(jq -r '(.chapters // []) | length' <<< "$json")
+
+            echo "Processing: $title"
+            echo "Link: https://youtu.be/$vid"
+            echo "----------------------------------------"
+            if [[ "$n" -gt 0 ]]; then
+                if command -v column >/dev/null 2>&1; then
+                    jq -r --arg dir "$sort_dir" "$jq_prog" <<< "$json" | column -t -s $'\t'
+                else
+                    jq -r --arg dir "$sort_dir" "$jq_prog" <<< "$json"
+                fi
+            else
+                echo "Chapters nahi hain"
+            fi
+
+            # Video ke baad 5 khaali lines ka gap
+            for (( i = 0; i < gap; i++ )); do echo ""; done
+        done < <(PYTHONUNBUFFERED=1 yt-dlp -j --skip-download --no-warnings --ignore-errors \
+                    "$url" < /dev/null 2>/dev/null | jq -c --unbuffered '{id, title, chapters}' 2>/dev/null)
+
+        [[ $found -eq 0 ]] && echo "Failed: $url" >&2
+    done
+    return 0
+}
+
+
+
+
+
+
+
+
+
+
+
+#yt-comment-download
+yt-comment-download () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-comment-download [options] <input> [input2 ...]
+
+Ye function video ke comments download karke .info.json file me save karta hai
+(video download nahi hota). Playlist/channel ke videos parallel me tez download hote hain.
+
+Chalane par ye 2 sawaal poochega (Enter dabane par default):
+  1) Folder?   1 = YouTuber ke naam ka folder   2 = bina folder   (default 2)
+  2) Replies?  1 = comments + replies           2 = sirf comments (default 1)
+
+Options:
+  -f, --folder       Folder banao (pehla sawaal skip)
+  -H, --here         Folder mat banao (pehla sawaal skip)
+  -r, --replies      Comments + replies dono (doosra sawaal skip)
+  -R, --no-replies   Sirf comments, replies nahi (doosra sawaal skip, bahut tez)
+  -d, --dir DIR      Is folder me save karo (default: current folder)
+  -n, --max N        Sirf N comments lao (default: sab, bade video me time lagta hai)
+  -s, --sort S       Comments ka order: top (default) ya new
+  -j, --jobs N       Ek saath kitne videos (default: 4, max 16)
+  -h, --help         Ye help
+
+Kya kya input de sakte ho:
+  1. Single video URL
+       yt-comment-download https://www.youtube.com/watch?v=XXXX
+  2. Multiple URLs ek saath
+       yt-comment-download "url1" "url2" "url3"
+  3. Playlist URL (har video ke comments)
+       yt-comment-download https://www.youtube.com/playlist?list=PLxxxx
+  4. Channel URL
+       yt-comment-download https://www.youtube.com/@channelname/videos
+  5. Text file (har line me ek URL, # wali line skip)
+       yt-comment-download urls.txt
+  6. File + URLs mix
+       yt-comment-download -n 200 urls.txt https://youtu.be/YYYY
+
+Examples:
+  yt-comment-download -n 100 -s new https://youtu.be/XXXX
+  yt-comment-download -f -r -j 6 -d ~/comments https://youtube.com/playlist?list=PLxxx&si=yyy
+  yt-comment-download -H -R https://youtu.be/XXXX
+
+Save hone ki jagah:
+  Folder ke saath: <dir>/YouTuber Name/Video Title [VIDEO_ID].info.json
+  Folder ke bina : <dir>/Video Title [VIDEO_ID].info.json
+
+Comments padhne ke liye (jq chahiye):
+  jq -r '.comments[] | "\(.author): \(.text)"' "file.info.json"
+
+Tips:
+  - Ek hi video ho (ya -j 1) to yt-dlp ka progress dikhta hai
+  - YouTube slow ya block kare to -j kam karo (jaise -j 2)
+  - Same video dobara chalane par file naye comments ke saath update ho jaati hai
+  - Fail hone wale URL ke liye "Failed: <url>" stderr me dikhega
+EOF
+        return 0
+    fi
+
+    local outdir="" max="" sort="" choice="" rchoice="" arg line url template ea
+    local par=4 restore_m=0 interrupted=0
+    local tmp n total item depth got v rc okc=0 failc=0 f reason out
+    local vre='(youtu\.be/|[?&]v=|/shorts/|/live/|/embed/)'
+    local -a opts=() inputs=() extra=() queue=() next=() vids=() common=() failed=() np=()
+    local -A seen=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -f|--folder) choice="1"; shift ;;
+            -H|--here)   choice="2"; shift ;;
+            -r|--replies)    rchoice="1"; shift ;;
+            -R|--no-replies) rchoice="2"; shift ;;
+            -d|--dir)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad folder do" >&2; return 1; }
+                outdir="$2"; shift 2 ;;
+            -n|--max)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad number do" >&2; return 1; }
+                [[ "$2" =~ ^[0-9]+$ && "$2" -gt 0 ]] || { echo "Error: -n ke liye positive number do" >&2; return 1; }
+                max="$2"; shift 2 ;;
+            -j|--jobs)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad number do" >&2; return 1; }
+                [[ "$2" =~ ^[0-9]+$ && "$2" -ge 1 && "$2" -le 16 ]] || { echo "Error: -j 1 se 16 ke beech ho" >&2; return 1; }
+                par="$2"; shift 2 ;;
+            -s|--sort)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad top ya new do" >&2; return 1; }
+                sort="${2,,}"
+                [[ "$sort" == "top" || "$sort" == "new" ]] || { echo "Error: sort sirf top ya new ho sakta hai" >&2; return 1; }
+                shift 2 ;;
+            --) shift; opts+=("$@"); break ;;
+            -*) echo "Error: unknown option '$1' (-h se help dekho)" >&2; return 1 ;;
+            *)  opts+=("$1"); shift ;;
+        esac
+    done
+
+    command -v yt-dlp >/dev/null 2>&1 || { echo "Error: yt-dlp install nahi hai" >&2; return 1; }
+
+    for arg in "${opts[@]}"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                inputs+=("$line")
+            done < "$arg"
+        else
+            inputs+=("$arg")
+        fi
+    done
+
+    if [[ ${#inputs[@]} -eq 0 ]]; then
+        echo "Error: koi valid URL nahi mila" >&2
+        return 1
+    fi
+
+    # ---- Sawaal 1: folder (default 2 = bina folder) ----
+    if [[ -z "$choice" ]]; then
+        if [[ -t 0 ]]; then
+            while true; do
+                echo
+                echo "Comments kaise save karne hain?"
+                echo "  1) YouTuber ke naam ka folder banao, aur comments uske andar save karo"
+                echo "  2) Folder mat banao, comments seedha is folder me save karo"
+                read -r -p "Option chuno [1/2] (Enter = 2): " choice
+                choice="${choice:-2}"
+                [[ "$choice" == "1" || "$choice" == "2" ]] && break
+                echo "Galat option, sirf 1 ya 2 likho." >&2
+            done
+        else
+            choice="2"
+        fi
+    fi
+
+    # ---- Sawaal 2: replies (default 1 = comments + replies) ----
+    if [[ -z "$rchoice" ]]; then
+        if [[ -t 0 ]]; then
+            while true; do
+                echo
+                echo "Kya chahiye?"
+                echo "  1) Comments + replies dono"
+                echo "  2) Sirf comments, bina replies (bahut tez)"
+                read -r -p "Option chuno [1/2] (Enter = 1): " rchoice
+                rchoice="${rchoice:-1}"
+                [[ "$rchoice" == "1" || "$rchoice" == "2" ]] && break
+                echo "Galat option, sirf 1 ya 2 likho." >&2
+            done
+        else
+            rchoice="1"
+        fi
+    fi
+
+    if [[ "$choice" == "1" ]]; then
+        template="%(uploader,channel|Unknown Channel)s/%(title).200B [%(id)s]"
+    else
+        template="%(title).200B [%(id)s]"
+    fi
+
+    if [[ -n "$outdir" ]]; then
+        mkdir -p -- "$outdir" || { echo "Error: folder ban nahi paaya: $outdir" >&2; return 1; }
+        template="$outdir/$template"
+    fi
+
+    # Comment options (youtube extractor-args)
+    ea=""
+    [[ -n "$sort" ]] && ea="comment_sort=$sort"
+    if [[ "$rchoice" == "2" ]]; then
+        [[ -n "$ea" ]] && ea+=";"
+        ea+="max_comments=${max:-all},all,0"
+    elif [[ -n "$max" ]]; then
+        [[ -n "$ea" ]] && ea+=";"
+        ea+="max_comments=$max"
+    fi
+    [[ -n "$ea" ]] && extra=(--extractor-args "youtube:$ea")
+
+    # ---- Step 1: playlist/channel se video links nikalo (fast, flat) ----
+    for url in "${inputs[@]}"; do
+        queue=("$url")
+        for depth in 1 2 3; do
+            next=()
+            for item in "${queue[@]}"; do
+                if [[ ( "$item" =~ $vre && "$item" != *list=* ) || $depth -eq 3 ]]; then
+                    if [[ -z "${seen[$item]}" ]]; then seen[$item]=1; vids+=("$item"); fi
+                    continue
+                fi
+                got=0
+                while IFS= read -r v; do
+                    [[ -z "$v" || "$v" == "NA" ]] && continue
+                    got=1
+                    next+=("$v")
+                done < <(yt-dlp --flat-playlist --no-warnings --print "%(url)s" -- "$item" </dev/null 2>/dev/null)
+                if [[ $got -eq 0 && $depth -eq 1 ]]; then
+                    if [[ -z "${seen[$item]}" ]]; then seen[$item]=1; vids+=("$item"); fi
+                fi
+            done
+            queue=("${next[@]}")
+            [[ ${#queue[@]} -eq 0 ]] && break
+        done
+    done
+
+    total=${#vids[@]}
+    if [[ $total -eq 0 ]]; then
+        echo "Error: koi video nahi mila" >&2
+        return 1
+    fi
+    echo "Total videos: $total"
+
+    common=(--skip-download --write-comments --write-info-json --no-write-playlist-metafiles
+            --ignore-errors --ignore-no-formats-error --no-warnings --socket-timeout 30
+            "${extra[@]}" -o "$template")
+
+    [[ $- == *m* ]] && restore_m=1
+    set +m
+    trap 'interrupted=1; echo; echo "Stopping...";
+          for f in $(jobs -p); do pkill -TERM -P "$f" 2>/dev/null; kill "$f" 2>/dev/null; done' INT
+
+    if (( total == 1 || par == 1 )); then
+        for item in "${vids[@]}"; do
+            (( interrupted )) && break
+            echo "Processing: $item"
+            np=()
+            [[ "$item" =~ $vre && "$item" != *list=* ]] && np=(--no-playlist)
+            yt-dlp "${common[@]}" "${np[@]}" --newline -- "$item" < /dev/null
+            rc=$?
+            if (( rc == 0 )); then
+                okc=$(( okc + 1 ))
+            else
+                failc=$(( failc + 1 ))
+                failed+=("$item")
+                echo "Failed: $item (exit code $rc)" >&2
+            fi
+        done
+    else
+        tmp=$(mktemp -d) || { trap - INT; [[ $restore_m -eq 1 ]] && set -m; echo "Error: temp folder nahi ban paaya" >&2; return 1; }
+        echo "Parallel: $par videos ek saath"
+        n=0
+        for item in "${vids[@]}"; do
+            (( interrupted )) && break
+            while (( $(jobs -rp | wc -l) >= par )); do
+                (( interrupted )) && break
+                wait -n 2>/dev/null || sleep 0.2
+            done
+            (( interrupted )) && break
+            n=$(( n + 1 ))
+            (
+                np=()
+                [[ "$item" =~ $vre && "$item" != *list=* ]] && np=(--no-playlist)
+                out=$(yt-dlp "${common[@]}" "${np[@]}" -q -- "$item" < /dev/null 2>&1)
+                rc=$?
+                if (( rc == 0 )); then
+                    : > "$tmp/ok.$n"
+                    printf 'Done: %s\n' "$item"
+                else
+                    reason=$(grep -m1 'ERROR' <<< "$out" | cut -c1-150)
+                    printf '%s\n' "$item" > "$tmp/fail.$n"
+                    printf 'Failed: %s (%s)\n' "$item" "${reason:-exit code $rc}" >&2
+                fi
+            ) &
+        done
+        wait
+        for f in "$tmp"/ok.*;   do [[ -e "$f" ]] && okc=$(( okc + 1 )); done
+        for f in "$tmp"/fail.*; do [[ -e "$f" ]] && { failc=$(( failc + 1 )); failed+=("$(<"$f")"); }; done
+        rm -rf -- "$tmp"
+    fi
+
+    trap - INT
+    [[ $restore_m -eq 1 ]] && set -m
+
+    echo
+    echo "Done: $okc | Failed: $failc | Total: $total"
+    if (( failc > 0 )); then
+        echo "Failed videos:" >&2
+        printf '  %s\n' "${failed[@]}" >&2
+    fi
+    (( interrupted )) && return 130
+    (( failc == 0 ))
+}
+
+
+
+
+
+
+
+
+
+
+#yt-comment-count
+yt-comment-count () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-comment-count <input> [input2 ...]
+
+Ye function har video ka title aur uske total comments ki ginti dikhata hai,
+aur aakhir me sabka grand total deta hai. Har video ka result milte hi turant
+dikhta hai. Har video ke beech 2 line ka gap aata hai.
+
+Kya kya input de sakte ho:
+  1. Single video URL
+       yt-comment-count https://www.youtube.com/watch?v=XXXX
+  2. Multiple URLs ek saath
+       yt-comment-count "url1" "url2" "url3"
+  3. Playlist URL (har video ke comments + total)
+       yt-comment-count https://www.youtube.com/playlist?list=PLxxxx
+  4. Channel URL
+       yt-comment-count https://www.youtube.com/@channelname/videos
+  5. Text file (har line me ek URL, # wali line skip)
+       yt-comment-count urls.txt
+  6. File + URLs mix
+       yt-comment-count urls.txt https://youtu.be/YYYY
+
+Output format:
+  Video Title   : Video ka naam
+  Total comment : 1234
+
+  ... (har video ke liye)
+
+  total comment : <sab videos ka jod>
+
+Tips:
+  - Jis video me comments band hain, uska count 0 dikhta hai
+  - Same video do baar aaye to sirf ek baar gina jaata hai
+  - File me save karne ke liye: yt-comment-count urls.txt > counts.txt
+  - Fail hone wale URL ke liye "Failed: <url>" stderr me dikhega
+EOF
+        return 0
+    fi
+
+    local gap=2          # ek video aur doosre video ke beech kitni khaali lines
+    local arg line url title count found i vid
+    local first=1 grand_total=0 videos=0
+    local sep="-------------------------------------------------------------------------------------------------------------------"
+    local -a inputs=()
+    local -A seen=()
+
+    command -v yt-dlp >/dev/null 2>&1 || { echo "Error: yt-dlp install nahi hai" >&2; return 1; }
+
+    for arg in "$@"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                inputs+=("$line")
+            done < "$arg"
+        else
+            inputs+=("$arg")
+        fi
+    done
+
+    if [[ ${#inputs[@]} -eq 0 ]]; then
+        echo "Error: koi valid URL nahi mila" >&2
+        return 1
+    fi
+
+    for url in "${inputs[@]}"; do
+        found=0
+        # Ek video ke liye 3 line aati hain: id, title, comment_count (turant stream hoti hain)
+        while IFS= read -r vid && IFS= read -r title && IFS= read -r count; do
+            found=1
+
+            # Same video dobara aaye to skip
+            [[ -n "${seen[$vid]}" ]] && continue
+            seen[$vid]=1
+
+            # Count sirf number ho, warna 0
+            [[ "$count" =~ ^[0-9]+$ ]] || count=0
+            grand_total=$(( grand_total + count ))
+            videos=$(( videos + 1 ))
+
+            if [[ $first -eq 0 ]]; then
+                for (( i = 0; i < gap; i++ )); do echo ""; done
+            fi
+            first=0
+
+            printf 'Video Title   : %s\n' "$title"
+            printf 'Total comment : %s\n' "$count"
+        done < <(PYTHONUNBUFFERED=1 yt-dlp \
+                    --yes-playlist \
+                    --skip-download \
+                    --ignore-errors \
+                    --no-warnings \
+                    --print "%(id)s" \
+                    --print "%(title)s" \
+                    --print "%(comment_count|0)s" \
+                    "$url" < /dev/null 2>/dev/null)
+
+        [[ $found -eq 0 ]] && echo "Failed: $url" >&2
+    done
+
+    echo
+    echo "$sep"
+    echo "total videos  : $videos"
+    echo "total comment : $grand_total"
+    echo "$sep"
+    return 0
+}
+
+
+
+
+
+
+
+
+
+#yt-json-username
+yt-json-username () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-json-username [options] <input> [input2 ...]
+
+Ye function yt-dlp ki .info.json files (jo yt-comment-download se bani hoon)
+me se comment karne walon ke unique usernames nikalta hai.
+List hamesha A-Z sorted aati hai (capital/small ka farak nahi).
+
+Options:
+  -c, --count    Har user ke kitne comments hain wo bhi dikhao
+                 (zyada comments wale pehle, barabar wale A-Z)
+  -a, --alpha    -c ke saath use karo: count dikhao, lekin A-Z order me
+  -h, --help     Ye help
+
+Kya kya input de sakte ho:
+  1. Single json file
+       yt-json-username "video.info.json"
+  2. Multiple json files
+       yt-json-username a.info.json b.info.json
+  3. Wildcard
+       yt-json-username *.info.json
+  4. Folder (uske andar ki saari .json files, subfolders ke saath)
+       yt-json-username ~/comments
+  5. File + folder mix
+       yt-json-username -c a.info.json ~/comments
+
+Output format:
+  @aman
+  @Bhavesh
+  @charlie
+
+  (-c ke saath)
+  42 @charlie
+  17 @aman
+
+  (-c -a ke saath)
+  17 @aman
+  42 @charlie
+
+Zaruri tool: jq
+
+Tips:
+  - File me save karne ke liye: yt-json-username *.info.json > users.txt
+  - Jis file me comments nahi hain wo chup-chaap skip hoti hai
+  - Kharab/invalid json ya na milne wali file ke liye "Failed: <file>" stderr me dikhega
+EOF
+        return 0
+    fi
+
+    local count=0 alpha=0 arg f
+    local -a opts=() files=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -c|--count) count=1; shift ;;
+            -a|--alpha) alpha=1; shift ;;
+            --) shift; opts+=("$@"); break ;;
+            -*) echo "Error: unknown option '$1' (-h se help dekho)" >&2; return 1 ;;
+            *)  opts+=("$1"); shift ;;
+        esac
+    done
+
+    command -v jq >/dev/null 2>&1 || { echo "Error: jq install nahi hai" >&2; return 1; }
+
+    for arg in "${opts[@]}"; do
+        if [[ -d "$arg" ]]; then
+            while IFS= read -r -d '' f; do
+                files+=("$f")
+            done < <(find "$arg" -type f -name '*.json' -print0 2>/dev/null | sort -z)
+        elif [[ -f "$arg" ]]; then
+            files+=("$arg")
+        else
+            echo "Failed: $arg (file/folder nahi mila)" >&2
+        fi
+    done
+
+    if [[ ${#files[@]} -eq 0 ]]; then
+        echo "Error: koi valid json file nahi mili" >&2
+        return 1
+    fi
+
+    {
+        for f in "${files[@]}"; do
+            jq -r '.comments[]? | (.author // empty) | gsub("[\r\n]"; " ")' "$f" 2>/dev/null \
+                || echo "Failed: $f" >&2
+        done
+    } \
+    | awk '{ print tolower($0) "\t" $0 }' \
+    | LC_ALL=C sort -t $'\t' -k1,1 -k2,2 \
+    | cut -f2- \
+    | {
+        if [[ $count -eq 1 ]]; then
+            if [[ $alpha -eq 1 ]]; then
+                uniq -c
+            else
+                uniq -c | sort -s -k1,1nr
+            fi
+        else
+            uniq
+        fi
+    }
+    return 0
+}
+
+
+
+
+
+
+
+
+
+#yt-user-picture
+yt-user-picture () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-pic [options] <input> [input2 ...]
+
+Ye function YouTuber ki profile picture (thumbnail) download karta hai.
+Har picture milte hi turant dikhta hai. Jin users ki picture download nahi
+hoti, unki list aakhir me ASCII table me (kaaran ke saath) dikhti hai.
+
+Options:
+  -q, --quality Q    Size: 1|s48, 2|s88, 3|s176, 4|s400 (default), 5|s800
+                     (koi bhi number bhi chalega, jaise 300)
+  -d, --dir DIR      Is folder me save karo (default: Youtube_user_picture)
+  -F, --force        Pehle se downloaded picture ko dobara download karo
+  -i, --interactive  Pehle jaisa menu/prompt wala mode
+  -h, --help         Ye help
+
+Kya kya input de sakte ho:
+  1. Ek username (@ ke saath ya bina)
+       yt-pic sohan
+       yt-pic @sohan
+  2. Multiple usernames ek saath
+       yt-pic sohan mohan @king
+  3. Text file (har line me ek username, # wali line skip)
+       yt-pic users.txt
+  4. File + usernames mix
+       yt-pic -q 800 users.txt @king
+
+  (yt-json-username -c wali output file bhi chalegi: "42 @user" jaisi lines)
+
+Examples:
+  yt-pic -q 4 -d ~/pics sohan mohan
+  yt-json-username *.info.json > users.txt ; yt-pic users.txt
+
+Save hone ki jagah:
+  <dir>/username.jpg
+
+Last me summary:
+  Downloaded / Skipped / Failed ki ginti, aur Failed users ka ASCII table:
+  +----+----------+-----------------------------+
+  | No | Username | Kaaran                      |
+  +----+----------+-----------------------------+
+  | 1  | @abc     | channel page nahi mila      |
+  +----+----------+-----------------------------+
+
+Tips:
+  - Jo picture pehle se hai wo skip hoti hai (dobara ke liye -F)
+  - Same username do baar ho to ek hi baar chalta hai
+  - File me save karne ke liye: yt-pic users.txt > result.txt
+    (progress aur table stdout me aate hain, Failed ki detail table me hai)
+EOF
+        return 0
+    fi
+
+    local quality="" outdir="Youtube_user_picture" force=0 interactive=0
+    local arg line u raw size page thumb hq img tmp ctype typed
+    local ok=0 skipped=0 i w1 w2 w3 border
+    local -a opts=() users=() typed_arr=() fail_user=() fail_why=()
+    local -A seen=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -q|--quality)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad quality do" >&2; return 1; }
+                quality="$2"; shift 2 ;;
+            -d|--dir)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad folder do" >&2; return 1; }
+                outdir="$2"; shift 2 ;;
+            -F|--force) force=1; shift ;;
+            -i|--interactive) interactive=1; shift ;;
+            --) shift; opts+=("$@"); break ;;
+            -*) echo "Error: unknown option '$1' (-h se help dekho)" >&2; return 1 ;;
+            *)  opts+=("$1"); shift ;;
+        esac
+    done
+
+    command -v curl >/dev/null 2>&1 || { echo "Error: curl install nahi hai" >&2; return 1; }
+    command -v grep >/dev/null 2>&1 && echo | grep -P '' >/dev/null 2>&1 \
+        || { echo "Error: GNU grep (-P support) chahiye" >&2; return 1; }
+
+    # Interactive mode: prompt se input lo
+    if [[ $interactive -eq 1 ]]; then
+        if [[ ! -t 0 ]]; then
+            echo "Error: yahan prompt nahi pooch sakta. Usernames seedha do." >&2
+            return 1
+        fi
+        read -r -p "Usernames (space se alag, ya file ka naam): " typed
+        read -r -a typed_arr <<< "$typed"
+        opts+=("${typed_arr[@]}")
+        if [[ -z "$quality" ]]; then
+            echo "Thumbnail quality:"
+            echo "1) s48   - chhoti"
+            echo "2) s88   - medium"
+            echo "3) s176  - achhi"
+            echo "4) s400  - badi (recommended)"
+            echo "5) s800  - bahut badi"
+            read -r -p "Enter choice [1-5] (Enter = 4): " quality
+        fi
+    fi
+
+    # Quality
+    case "${quality,,}" in
+        1|s48)         size="s48" ;;
+        2|s88)         size="s88" ;;
+        3|s176)        size="s176" ;;
+        ""|4|s400)     size="s400" ;;
+        5|s800)        size="s800" ;;
+        s[0-9]*)       size="${quality,,}" ;;
+        [0-9]*)        size="s${quality}" ;;
+        *) echo "Error: invalid quality '$quality'" >&2; return 1 ;;
+    esac
+    [[ "$size" =~ ^s[0-9]+$ ]] || { echo "Error: invalid quality '$quality'" >&2; return 1; }
+
+    # Usernames jama karo
+    for arg in "${opts[@]}"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                # "42 @user" jaisi line (count ke saath) me se sirf username lo
+                [[ "$line" =~ ^[0-9]+[[:space:]]+(.+)$ ]] && line="${BASH_REMATCH[1]}"
+                users+=("$line")
+            done < "$arg"
+        else
+            users+=("$arg")
+        fi
+    done
+
+    if [[ ${#users[@]} -eq 0 ]]; then
+        echo "Error: koi username nahi diya (-h se help dekho)" >&2
+        return 1
+    fi
+
+    mkdir -p -- "$outdir" || { echo "Error: folder ban nahi paaya: $outdir" >&2; return 1; }
+
+    for raw in "${users[@]}"; do
+        u="${raw#@}"
+        u="${u//[^[:alnum:]_.-]/}"      # sirf valid handle characters
+        if [[ -z "$u" ]]; then
+            echo "Failed: '$raw' (valid username nahi)"
+            fail_user+=("$raw"); fail_why+=("valid username nahi")
+            continue
+        fi
+
+        [[ -n "${seen[${u,,}]}" ]] && continue
+        seen[${u,,}]=1
+
+        img="$outdir/$u.jpg"
+        if [[ -f "$img" && -s "$img" && $force -eq 0 ]]; then
+            echo "Skip (pehle se hai): $img"
+            skipped=$(( skipped + 1 ))
+            continue
+        fi
+
+        page=$(curl -fsL --max-time 30 -A "Mozilla/5.0" -H "Accept-Language: en" \
+                    "https://www.youtube.com/@$u" 2>/dev/null)
+        if [[ -z "$page" ]]; then
+            echo "Failed: @$u (channel page nahi mila)"
+            fail_user+=("@$u"); fail_why+=("channel page nahi mila")
+            continue
+        fi
+
+        thumb=$(grep -Po '(?<=itemprop="image" content=")[^"]+' <<< "$page" | head -1)
+        [[ -z "$thumb" ]] && thumb=$(grep -Po '(?<=property="og:image" content=")[^"]+' <<< "$page" | head -1)
+        if [[ -z "$thumb" ]]; then
+            echo "Failed: @$u (profile picture nahi mili)"
+            fail_user+=("@$u"); fail_why+=("profile picture nahi mili")
+            continue
+        fi
+
+        thumb="${thumb//&amp;/&}"
+        if [[ "$thumb" =~ =s[0-9]+ ]]; then
+            hq=$(sed -E "s/=s[0-9]+/=${size}/" <<< "$thumb")
+        else
+            hq="$thumb"
+        fi
+
+        # Pehle temp file me download, sahi nikle tabhi final naam
+        tmp="$img.part"
+        ctype=$(curl -fsL --max-time 60 -o "$tmp" -w '%{content_type}' "$hq" 2>/dev/null)
+        if [[ -s "$tmp" && "$ctype" == image/* ]]; then
+            mv -f -- "$tmp" "$img"
+            echo "Downloaded -> $img"
+            ok=$(( ok + 1 ))
+        else
+            rm -f -- "$tmp"
+            echo "Failed: @$u (image download nahi hui)"
+            fail_user+=("@$u"); fail_why+=("image download nahi hui")
+        fi
+    done
+
+    # ---- Last me summary + failed users ka ASCII table ----
+    echo
+    echo "Downloaded: $ok | Skipped: $skipped | Failed: ${#fail_user[@]}"
+
+    if [[ ${#fail_user[@]} -gt 0 ]]; then
+        w1=2; w2=8; w3=6      # min widths: "No", "Username", "Kaaran"
+        (( ${#fail_user[@]} > 99 )) && w1=${#fail_user[@]}
+        for i in "${!fail_user[@]}"; do
+            (( ${#fail_user[i]} > w2 )) && w2=${#fail_user[i]}
+            (( ${#fail_why[i]} > w3 )) && w3=${#fail_why[i]}
+        done
+
+        border=$(printf '+-%s-+-%s-+-%s-+' \
+                    "$(printf '%*s' "$w1" '' | tr ' ' '-')" \
+                    "$(printf '%*s' "$w2" '' | tr ' ' '-')" \
+                    "$(printf '%*s' "$w3" '' | tr ' ' '-')")
+
+        echo
+        echo "Failed users:"
+        echo "$border"
+        printf '| %-*s | %-*s | %-*s |\n' "$w1" "No" "$w2" "Username" "$w3" "Kaaran"
+        echo "$border"
+        for i in "${!fail_user[@]}"; do
+            printf '| %-*s | %-*s | %-*s |\n' \
+                "$w1" "$(( i + 1 ))" "$w2" "${fail_user[i]}" "$w3" "${fail_why[i]}"
+        done
+        echo "$border"
+    fi
+
+    [[ ${#fail_user[@]} -eq 0 ]]
+}
+
+
+
+
+
+
+
+
+
+
+#yt-screenshot
+yt-screenshot () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-screenshot [options] <input> [input2 ...]
+
+YouTuber ke channel page ka screenshot leta hai (Brave headless).
+VPN on ya off, dono me chalta hai (cookie consent page apne aap handle hota hai).
+
+Pehle har channel ki tab list padhi jaati hai, phir sirf wahi sections
+ke screenshot bante hain jo us channel me sach me hain. Jo section
+nahi hai, uska screenshot (Home ka copy bhi) nahi banta.
+Tez chalne ke liye: Home ka screenshot detection ke saath hi ho jaata hai,
+aur sab sections parallel tabs me chalte hain.
+
+Options:
+  -s, --section S    Section (comma se multiple, ya all). Na do to menu se poochega
+                       1 home      2 videos     3 shorts    4 live
+                       5 podcasts  6 playlists  7 posts     8 store
+                       9 courses  10 releases   all = sab
+  -f, --folders      Har user ke naam (bina @) ka folder banao, uske andar screenshot
+  -n, --no-folders   Folder mat banao, sab screenshot ek hi folder me
+                     (-f/-n na do aur "all" chuno, to poochega)
+  -d, --dir DIR      Save folder (default: youtube_profile_screenshort)
+  -j, --jobs N       Ek saath kitne tabs (default: 6, max 16)
+  -t, --timeout N    Har page ke liye max seconds (default: 25)
+  -w, --wait MS      Page load ke baad extra wait ms (default: 300)
+  -S, --size WxH     Screenshot size (default: 1280x900)
+  -F, --force        Pehle se bane screenshot ko dobara lo
+                     (jo section channel me nahi, uski purani galat file hat jaati hai)
+  -i, --interactive  Usernames prompt se poochho
+  -v, --verbose      Debug jaankari dikhao
+  -h, --help         Ye help
+
+Input:
+  yt-screenshot sohan mohan @king
+  yt-screenshot users.txt              (har line me ek username, # skip)
+  yt-screenshot -s videos,podcasts users.txt @king
+  yt-screenshot -s all -f users.txt
+  (yt-json-username -c wali "42 @user" lines bhi chalti hain)
+
+Save hone ki jagah:
+  Folder ke bina : <dir>/username.png, <dir>/username_videos.png ...
+  Folder ke saath: <dir>/username/username.png, <dir>/username/username_videos.png ...
+
+Tips:
+  - Failed users "fail_ss.txt" me save hote hain: yt-screenshot fail_ss.txt
+  - Ctrl+C par ruk jaata hai, bache hue users "stop_process_last_user.txt" me save hote hain
+  - Fail/timeout zyada aaye to -j kam karo (jaise -j 3); machine tez ho to -j 8
+  - Browser alag chahiye to: YT_SS_BROWSER=/path/to/brave yt-screenshot ...
+EOF
+        return 0
+    fi
+
+    local sec="" outdir="youtube_profile_screenshort" tmo=25 jobs=6 settle=300 size="1280x900"
+    local force=0 interactive=0 verbose=0 folders="" allsel=0 ans
+    local arg line u raw typed bin b profile ufile bfile rc tok l
+    local -a opts=() users=() typed_arr=() labels=()
+    local -A seen=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -s|--section)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad section do" >&2; return 1; }
+                sec="$2"; shift 2 ;;
+            -f|--folders) folders=1; shift ;;
+            -n|--no-folders) folders=0; shift ;;
+            -d|--dir)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad folder do" >&2; return 1; }
+                outdir="$2"; shift 2 ;;
+            -j|--jobs)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad number do" >&2; return 1; }
+                [[ "$2" =~ ^[0-9]+$ && "$2" -ge 1 && "$2" -le 16 ]] || { echo "Error: -j 1 se 16 ke beech ho" >&2; return 1; }
+                jobs="$2"; shift 2 ;;
+            -t|--timeout)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad seconds do" >&2; return 1; }
+                [[ "$2" =~ ^[0-9]+$ && "$2" -gt 0 ]] || { echo "Error: -t ke liye positive number do" >&2; return 1; }
+                tmo="$2"; shift 2 ;;
+            -w|--wait)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad milliseconds do" >&2; return 1; }
+                [[ "$2" =~ ^[0-9]+$ ]] || { echo "Error: -w ke liye number do" >&2; return 1; }
+                settle="$2"; shift 2 ;;
+            -S|--size)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad WxH do" >&2; return 1; }
+                [[ "$2" =~ ^[0-9]{3,5}x[0-9]{3,5}$ ]] || { echo "Error: size aise do: 1280x900" >&2; return 1; }
+                size="$2"; shift 2 ;;
+            -F|--force) force=1; shift ;;
+            -v|--verbose) verbose=1; shift ;;
+            -i|--interactive) interactive=1; shift ;;
+            --) shift; opts+=("$@"); break ;;
+            -*) echo "Error: unknown option '$1' (-h se help dekho)" >&2; return 1 ;;
+            *)  opts+=("$1"); shift ;;
+        esac
+    done
+
+    command -v python3 >/dev/null 2>&1 || { echo "Error: python3 install nahi hai" >&2; return 1; }
+
+    bin=""
+    for b in "${YT_SS_BROWSER:-}" brave-browser brave brave-browser-stable \
+             /opt/brave.com/brave/brave-browser google-chrome google-chrome-stable \
+             chromium chromium-browser; do
+        [[ -z "$b" ]] && continue
+        if command -v "$b" >/dev/null 2>&1; then bin=$(command -v "$b"); break; fi
+    done
+    [[ -z "$bin" ]] && { echo "Error: Brave/Chrome/Chromium nahi mila" >&2; return 1; }
+
+    if [[ $interactive -eq 1 ]]; then
+        if [[ ! -t 0 ]]; then
+            echo "Error: yahan prompt nahi pooch sakta. Usernames seedha do." >&2
+            return 1
+        fi
+        read -r -p "Usernames (space se alag, ya file ka naam): " typed
+        read -r -a typed_arr <<< "$typed"
+        opts+=("${typed_arr[@]}")
+    fi
+
+    if [[ -z "$sec" && -t 0 ]]; then
+        echo "Select section to screenshot:"
+        echo " 1) Home (default)"
+        echo " 2) Videos"
+        echo " 3) Shorts"
+        echo " 4) Live"
+        echo " 5) Podcasts"
+        echo " 6) Playlists"
+        echo " 7) Posts"
+        echo " 8) Store"
+        echo " 9) Courses"
+        echo "10) Releases"
+        echo "(multiple: 1,2,5  |  sab: all)"
+        read -r -p "Enter choice (default=1): " sec
+    fi
+    for tok in ${sec//,/ }; do
+        case "${tok,,}" in
+            1|home)             l=home ;;
+            2|video|videos)     l=videos ;;
+            3|short|shorts)     l=shorts ;;
+            4|live|streams)     l=live ;;
+            5|podcast|podcasts) l=podcasts ;;
+            6|playlist|playlists) l=playlists ;;
+            7|post|posts|community) l=posts ;;
+            8|store)            l=store ;;
+            9|course|courses)   l=courses ;;
+            10|release|releases) l=releases ;;
+            all) labels=(home videos shorts live podcasts playlists posts store courses releases); allsel=1; break ;;
+            *) echo "Error: invalid section '$tok' (-h se list dekho)" >&2; return 1 ;;
+        esac
+        [[ " ${labels[*]} " == *" $l "* ]] || labels+=("$l")
+    done
+    [[ ${#labels[@]} -eq 0 ]] && labels=(home)
+    [[ ${#labels[@]} -eq 10 ]] && allsel=1
+
+    if [[ -z "$folders" ]]; then
+        if [[ $allsel -eq 1 && -t 0 ]]; then
+            while true; do
+                echo
+                echo "Screenshot kaise save karne hain?"
+                echo "  1) Har user ke naam ka folder banao (bina @), screenshot uske andar"
+                echo "  2) Folder mat banao, sab screenshot ek hi folder me"
+                read -r -p "Option chuno [1/2] (Enter = 1): " ans
+                ans="${ans:-1}"
+                case "$ans" in
+                    1) folders=1; break ;;
+                    2) folders=0; break ;;
+                    *) echo "Galat option, sirf 1 ya 2 likho." >&2 ;;
+                esac
+            done
+        elif [[ $allsel -eq 1 ]]; then
+            folders=1
+        else
+            folders=0
+        fi
+    fi
+
+    ufile=$(mktemp) || { echo "Error: temp file nahi ban paayi" >&2; return 1; }
+    bfile=$(mktemp) || { rm -f "$ufile"; echo "Error: temp file nahi ban paayi" >&2; return 1; }
+
+    for arg in "${opts[@]}"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                [[ "$line" =~ ^[0-9]+[[:space:]]+(.+)$ ]] && line="${BASH_REMATCH[1]}"
+                users+=("$line")
+            done < "$arg"
+        else
+            users+=("$arg")
+        fi
+    done
+
+    for raw in "${users[@]}"; do
+        u="${raw#@}"
+        u="${u//[^[:alnum:]_.-]/}"
+        if [[ -z "$u" || "$u" == "." || "$u" == ".." ]]; then
+            printf '%s\n' "$raw" >> "$bfile"
+            continue
+        fi
+        [[ -n "${seen[${u,,}]}" ]] && continue
+        seen[${u,,}]=1
+        printf '%s\n' "$u" >> "$ufile"
+    done
+
+    if [[ ! -s "$ufile" && ! -s "$bfile" ]]; then
+        rm -f "$ufile" "$bfile"
+        echo "Error: koi username nahi diya (-h se help dekho)" >&2
+        return 1
+    fi
+
+    mkdir -p -- "$outdir" || { rm -f "$ufile" "$bfile"; echo "Error: folder ban nahi paaya: $outdir" >&2; return 1; }
+    outdir=$(cd -- "$outdir" && pwd) || { rm -f "$ufile" "$bfile"; echo "Error: folder me ja nahi paaya" >&2; return 1; }
+
+    profile=$(mktemp -d "${HOME:-/tmp}/yt-ss-tmp.XXXXXX" 2>/dev/null) || profile=$(mktemp -d) \
+        || { rm -f "$ufile" "$bfile"; echo "Error: temp profile nahi ban paaya" >&2; return 1; }
+
+    YS_BIN="$bin" YS_PROFILE="$profile" YS_OUT="$outdir" YS_USERS="$ufile" YS_BAD="$bfile" \
+    YS_SECTIONS="${labels[*]}" YS_TMO="$tmo" YS_JOBS="$jobs" YS_SETTLE="$settle" \
+    YS_FORCE="$force" YS_SIZE="$size" YS_VERBOSE="$verbose" YS_FOLDERS="$folders" \
+    YS_FAILLOG="fail_ss.txt" YS_STOPLOG="stop_process_last_user.txt" \
+    python3 - <<'PYEOF'
+import os, sys, json, time, base64, socket, struct, subprocess, threading
+import urllib.request, urllib.parse, shutil, signal, hashlib
+from collections import deque
+
+E = os.environ
+BIN, PROF, OUT = E['YS_BIN'], E['YS_PROFILE'], E['YS_OUT']
+USERS = [l.strip() for l in open(E['YS_USERS'], encoding='utf-8') if l.strip()]
+BAD = [l.rstrip('\n') for l in open(E['YS_BAD'], encoding='utf-8') if l.strip()]
+LABELS = E['YS_SECTIONS'].split()
+TMO = float(E['YS_TMO'])
+JOBS = int(E['YS_JOBS'])
+SETTLE = int(E['YS_SETTLE']) / 1000.0
+FORCE = E['YS_FORCE'] == '1'
+FOLDERS = E.get('YS_FOLDERS') == '1'
+W, H = [int(x) for x in E['YS_SIZE'].split('x')]
+VERBOSE = E['YS_VERBOSE'] == '1'
+FAILLOG, STOPLOG = E['YS_FAILLOG'], E['YS_STOPLOG']
+ALL_LABELS = ['home', 'videos', 'shorts', 'live', 'podcasts', 'playlists', 'posts', 'store', 'courses', 'releases']
+PATHS = {'home': '', 'videos': '/videos', 'shorts': '/shorts', 'live': '/streams',
+         'podcasts': '/podcasts', 'playlists': '/playlists', 'posts': '/posts',
+         'store': '/store', 'courses': '/courses', 'releases': '/releases'}
+NAME2LABEL = {'home': 'home', 'videos': 'videos', 'shorts': 'shorts', 'live': 'live', 'streams': 'live',
+              'podcasts': 'podcasts', 'playlists': 'playlists', 'posts': 'posts', 'community': 'posts',
+              'store': 'store', 'courses': 'courses', 'releases': 'releases'}
+
+# Ye requests screenshot ke liye zaruri nahi: video stream, ads, analytics
+BLOCK = ['*://*.googlevideo.com/*', '*://*.doubleclick.net/*', '*://*.googlesyndication.com/*',
+         '*://*.google-analytics.com/*', '*://*.googletagmanager.com/*', '*://*.googleadservices.com/*',
+         '*://www.youtube.com/api/stats/*', '*://www.youtube.com/youtubei/v1/log_event*',
+         '*://www.youtube.com/ptracking*', '*://www.youtube.com/pagead/*']
+
+OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+COOKIES = [
+    {'name': 'SOCS', 'value': 'CAI', 'domain': '.youtube.com', 'path': '/', 'secure': True, 'expires': 2000000000},
+    {'name': 'CONSENT', 'value': 'PENDING+987', 'domain': '.youtube.com', 'path': '/', 'secure': True, 'expires': 2000000000},
+]
+
+STATE_JS = r"""(()=>{
+ const u=location.href;
+ const rx=/reject|decline|refuse|deny|rechaz|ablehn|refus|rifiut|rejeit|odrzu|weiger|avvis|afvis/i;
+ const txt=e=>((e.innerText||e.value||'')+' '+(e.getAttribute('aria-label')||''));
+ let consent=false, clicked=false;
+ if(/^https?:\/\/consent\./.test(u)){
+   consent=true;
+   const bs=[...document.querySelectorAll('button,input[type=submit]')];
+   let b=bs.find(x=>rx.test(txt(x)));
+   if(!b){const f=document.querySelector('form[action*="save"]'); if(f) b=f.querySelector('button,input[type=submit]');}
+   if(b){b.click(); clicked=true;}
+ } else {
+   const d=document.querySelector('ytd-consent-bump-v2-lightbox,ytd-consent-bump-lightbox');
+   if(d){
+     consent=true;
+     const b=[...d.querySelectorAll('button')].find(x=>rx.test(txt(x)));
+     if(b){b.click(); clicked=true;} else {d.remove(); document.querySelectorAll('tp-yt-iron-overlay-backdrop').forEach(e=>e.remove());}
+   }
+ }
+ const hdr=!!document.querySelector('yt-page-header-renderer,#channel-header,ytd-c4-tabbed-header-renderer,#page-header');
+ const vh=innerHeight; let pend=0;
+ for(const i of document.images){const r=i.getBoundingClientRect(); if(r.bottom>0&&r.top<vh&&r.width>8&&!i.complete) pend++;}
+ const bt=document.body?document.body.innerText.slice(0,1500):'';
+ const nf=!!document.querySelector('yt-error-state-renderer')||/This page isn.t available|This channel doesn.t exist/i.test(bt);
+ let tabs=[], selu='', selt='';
+ try{
+   const ts=(window.ytInitialData&&window.ytInitialData.contents&&window.ytInitialData.contents.twoColumnBrowseResultsRenderer&&window.ytInitialData.contents.twoColumnBrowseResultsRenderer.tabs)||[];
+   for(const x of ts){
+     const r=x.tabRenderer; if(!r) continue;
+     const eu=(((r.endpoint||{}).commandMetadata||{}).webCommandMetadata||{}).url||'';
+     tabs.push([eu,r.title||'']);
+     if(r.selected){selu=eu; selt=r.title||'';}
+   }
+ }catch(e){}
+ let dom=[], dsel='';
+ try{
+   for(const e of document.querySelectorAll('yt-tab-shape,tp-yt-paper-tab')){
+     const t=(e.getAttribute('tab-title')||e.innerText||'').trim();
+     if(!t) continue;
+     const s=e.getAttribute('aria-selected')==='true'||!!e.querySelector('[aria-selected="true"]')||/selected/.test(e.className||'');
+     dom.push([t,s]);
+     if(s) dsel=t;
+   }
+ }catch(e){}
+ return {u:u, p:location.pathname, rs:document.readyState, consent:consent, clicked:clicked, hdr:hdr, pend:pend, nf:nf,
+         tabs:tabs, selu:selu, selt:selt, dom:dom, dsel:dsel};
+})()"""
+
+
+def fpath(u, lb):
+    name = (u + '.png') if lb == 'home' else '%s_%s.png' % (u, lb)
+    if FOLDERS:
+        return os.path.join(OUT, u, name)
+    return os.path.join(OUT, name)
+
+
+class Fail(Exception):
+    def __init__(self, msg, retry=False, kind='fail'):
+        Exception.__init__(self, msg)
+        self.msg = msg
+        self.retry = retry
+        self.kind = kind
+
+
+class CDPError(Exception):
+    pass
+
+
+class WS:
+    def __init__(self, url):
+        u = urllib.parse.urlparse(url)
+        self.sock = socket.create_connection((u.hostname, u.port), timeout=10)
+        self.sock.settimeout(TMO + 20)
+        try:
+            self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        except Exception:
+            pass
+        key = base64.b64encode(os.urandom(16)).decode()
+        req = ('GET %s HTTP/1.1\r\nHost: %s:%d\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'
+               'Sec-WebSocket-Key: %s\r\nSec-WebSocket-Version: 13\r\n\r\n') % (u.path, u.hostname, u.port, key)
+        self.sock.sendall(req.encode())
+        buf = b''
+        while b'\r\n\r\n' not in buf:
+            chunk = self.sock.recv(4096)
+            if not chunk:
+                raise ConnectionError('websocket handshake fail')
+            buf += chunk
+        head, _, rest = buf.partition(b'\r\n\r\n')
+        if b' 101 ' not in head.split(b'\r\n')[0]:
+            raise ConnectionError('websocket reject: ' + head.split(b'\r\n')[0].decode(errors='ignore'))
+        self.buf = rest
+
+    def _read(self, n):
+        while len(self.buf) < n:
+            chunk = self.sock.recv(65536)
+            if not chunk:
+                raise ConnectionError('connection band ho gaya')
+            self.buf += chunk
+        d, self.buf = self.buf[:n], self.buf[n:]
+        return d
+
+    def send(self, text):
+        data = text.encode('utf-8')
+        n = len(data)
+        hdr = bytearray([0x81])
+        if n < 126:
+            hdr.append(0x80 | n)
+        elif n < 65536:
+            hdr.append(0x80 | 126); hdr += struct.pack('>H', n)
+        else:
+            hdr.append(0x80 | 127); hdr += struct.pack('>Q', n)
+        mask = os.urandom(4)
+        hdr += mask
+        self.sock.sendall(bytes(hdr) + bytes(b ^ mask[i % 4] for i, b in enumerate(data)))
+
+    def recv(self):
+        msg = b''
+        while True:
+            b1, b2 = self._read(2)
+            op, fin, ln = b1 & 0x0f, b1 & 0x80, b2 & 0x7f
+            if ln == 126:
+                ln = struct.unpack('>H', self._read(2))[0]
+            elif ln == 127:
+                ln = struct.unpack('>Q', self._read(8))[0]
+            if b2 & 0x80:
+                self._read(4)
+            payload = self._read(ln)
+            if op == 8:
+                raise ConnectionError('browser ne connection band kiya')
+            if op in (9, 10):
+                continue
+            msg += payload
+            if fin:
+                return msg.decode('utf-8', 'replace')
+
+    def close(self):
+        try:
+            self.sock.close()
+        except Exception:
+            pass
+
+
+class CDP:
+    def __init__(self, ws):
+        self.ws = ws
+        self.n = 0
+        self.s404 = False
+
+    def call(self, method, params=None):
+        self.n += 1
+        i = self.n
+        self.ws.send(json.dumps({'id': i, 'method': method, 'params': params or {}}))
+        while True:
+            m = json.loads(self.ws.recv())
+            if m.get('id') == i:
+                if 'error' in m:
+                    raise CDPError(m['error'].get('message', 'error'))
+                return m.get('result', {})
+            if m.get('method') == 'Network.responseReceived':
+                p = m.get('params', {})
+                r = p.get('response', {})
+                if p.get('type') == 'Document' and r.get('status') == 404 and 'youtube.com' in r.get('url', ''):
+                    self.s404 = True
+
+
+def http_json(port, path):
+    with OPENER.open('http://127.0.0.1:%d%s' % (port, path), timeout=5) as r:
+        return json.loads(r.read().decode('utf-8'))
+
+
+def start_browser():
+    last = ''
+    for mode in ('--headless=new', '--headless'):
+        pf = os.path.join(PROF, 'DevToolsActivePort')
+        try:
+            os.remove(pf)
+        except OSError:
+            pass
+        logp = os.path.join(PROF, 'browser.log')
+        log = open(logp, 'wb')
+        args = [BIN, mode, '--remote-debugging-port=0', '--remote-allow-origins=*',
+                '--user-data-dir=' + PROF, '--no-first-run', '--no-default-browser-check',
+                '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage', '--disable-extensions',
+                '--hide-scrollbars', '--mute-audio', '--lang=en-US',
+                '--disable-background-networking', '--disable-sync', '--disable-component-update',
+                '--disable-default-apps', '--disable-breakpad', '--metrics-recording-only',
+                '--disable-features=Translate,TranslateUI,MediaRouter,OptimizationHints',
+                '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
+                '--disable-backgrounding-occluded-windows', 'about:blank']
+        p = subprocess.Popen(args, stdout=log, stderr=log, stdin=subprocess.DEVNULL, start_new_session=True)
+        end = time.time() + 20
+        port = None
+        while time.time() < end and p.poll() is None:
+            try:
+                port = int(open(pf).read().split()[0])
+                http_json(port, '/json/version')
+                break
+            except Exception:
+                port = None
+                time.sleep(0.1)
+        if port:
+            return p, port
+        kill_browser(p)
+        try:
+            lines = [x for x in open(logp, errors='ignore').read().splitlines() if x.strip()]
+            last = lines[-1][:150] if lines else 'browser start nahi hua'
+        except Exception:
+            last = 'browser start nahi hua'
+    raise Fail(last)
+
+
+def kill_browser(p):
+    if p is None:
+        return
+    try:
+        os.killpg(p.pid, signal.SIGTERM)
+    except Exception:
+        pass
+    try:
+        p.wait(timeout=3)
+    except Exception:
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except Exception:
+            pass
+
+
+LOCK = threading.Lock()
+STOP = threading.Event()
+Q1 = deque()          # users (detection + home)
+Q2 = deque()          # (user, label, out) baaki sections
+ACTIVE = [0]          # abhi kitne users detection me hain
+FAILS = []
+MISSING = []
+DUPS = []
+USER_LEFT = {}
+HASHES = {}
+STATS = {'ok': 0, 'done': 0, 'total': 0}
+
+
+def to_label(url, title):
+    segs = [s for s in urllib.parse.unquote(url or '').split('?')[0].lower().split('/') if s]
+    if segs and segs[-1] in NAME2LABEL:
+        return NAME2LABEL[segs[-1]]
+    t = (title or '').strip().lower()
+    return NAME2LABEL.get(t)
+
+
+def available_labels(st):
+    out = set()
+    for t in st.get('tabs') or []:
+        lb = to_label(t[0], t[1])
+        if lb:
+            out.add(lb)
+    for t in st.get('dom') or []:
+        lb = to_label('', t[0])
+        if lb:
+            out.add(lb)
+    return out
+
+
+def selected_labels(st):
+    out = set()
+    lb = to_label(st.get('selu', ''), st.get('selt', ''))
+    if lb:
+        out.add(lb)
+    lb = to_label('', st.get('dsel', ''))
+    if lb:
+        out.add(lb)
+    return out
+
+
+class Tab:
+    def __init__(self, port):
+        ver = http_json(port, '/json/version')
+        ua = ver.get('User-Agent', '').replace('HeadlessChrome', 'Chrome')
+        self.bc = CDP(WS(ver['webSocketDebuggerUrl']))
+        self.tid = self.bc.call('Target.createTarget', {'url': 'about:blank', 'newWindow': True})['targetId']
+        self.c = CDP(WS('ws://127.0.0.1:%d/devtools/page/%s' % (port, self.tid)))
+        self.c.call('Network.enable')
+        try:
+            self.c.call('Network.setBlockedURLs', {'urls': BLOCK})
+        except CDPError:
+            pass
+        if ua:
+            self.c.call('Network.setUserAgentOverride', {'userAgent': ua, 'acceptLanguage': 'en-US,en;q=0.9'})
+        self.c.call('Network.setCookies', {'cookies': COOKIES})
+        self.c.call('Emulation.setDeviceMetricsOverride',
+                    {'width': W, 'height': H, 'deviceScaleFactor': 1, 'mobile': False})
+
+    def close(self):
+        try:
+            self.bc.call('Target.closeTarget', {'targetId': self.tid})
+        except Exception:
+            pass
+        self.c.ws.close()
+        self.bc.ws.close()
+
+    def load(self, url, need_tabs):
+        c = self.c
+        c.s404 = False
+        r = c.call('Page.navigate', {'url': url})
+        if r.get('errorText'):
+            raise Fail('net error: ' + r['errorText'], retry=True)
+        deadline = time.time() + TMO
+        settle_at = None
+        st = {}
+        good = False
+        while time.time() < deadline:
+            try:
+                r = c.call('Runtime.evaluate', {'expression': STATE_JS, 'returnByValue': True})
+                st = r.get('result', {}).get('value') or {}
+            except CDPError:
+                time.sleep(0.2)
+                continue
+            if c.s404:
+                raise Fail('channel nahi mila (404)')
+            if st.get('consent'):
+                settle_at = None
+                time.sleep(0.3)
+                continue
+            if st.get('nf'):
+                raise Fail('channel nahi mila')
+            ready = st.get('rs') == 'complete' and st.get('hdr') and st.get('pend', 0) == 0
+            if ready and need_tabs and not available_labels(st):
+                ready = False
+            if ready:
+                if settle_at is None:
+                    settle_at = time.time() + SETTLE
+                if time.time() >= settle_at:
+                    good = True
+                    break
+            else:
+                settle_at = None
+            time.sleep(0.1)
+        if not good:
+            if st.get('consent'):
+                raise Fail('consent page hat nahi paaya', retry=True)
+            if need_tabs and st.get('hdr') and not available_labels(st):
+                raise Fail('channel ki tab list nahi mili', retry=True)
+            if st.get('rs') != 'complete' and not st.get('hdr'):
+                raise Fail('timeout (%ds)' % TMO, retry=True)
+        return st
+
+    def capture(self, user, label, out):
+        r = self.c.call('Page.captureScreenshot', {'format': 'png'})
+        data = base64.b64decode(r.get('data', ''))
+        if len(data) < 1000:
+            raise Fail('screenshot khaali aaya', retry=True)
+        h = hashlib.sha256(data).hexdigest()
+        with LOCK:
+            seen = HASHES.setdefault(user, {})
+            other = seen.get(h)
+            if label != 'home' and other is not None and other != label:
+                raise Fail('%s jaisa hi screenshot hai' % other, kind='dup')
+            seen.setdefault(h, label)
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        tmp = out + '.part'
+        with open(tmp, 'wb') as f:
+            f.write(data)
+        os.replace(tmp, out)
+
+
+def report(user, label, out, kind, why):
+    with LOCK:
+        if kind != 'ok' and STOP.is_set():
+            return
+        STATS['done'] += 1
+        USER_LEFT[user] = USER_LEFT.get(user, 1) - 1
+        n, t = STATS['done'], STATS['total']
+        if kind == 'ok':
+            STATS['ok'] += 1
+            print('[%d/%d] Done: %s' % (n, t, out), flush=True)
+            return
+        if kind in ('missing', 'dup'):
+            if FORCE and os.path.isfile(out):
+                try:
+                    os.remove(out)
+                except OSError:
+                    pass
+            if kind == 'missing':
+                MISSING.append(('@' + user, label, why))
+                print('[%d/%d] Skip: @%s (%s) - %s' % (n, t, user, label, why), flush=True)
+            else:
+                DUPS.append(('@' + user, label, why))
+                print('[%d/%d] Skip: @%s (%s) - duplicate, %s' % (n, t, user, label, why), flush=True)
+        else:
+            FAILS.append(('@' + user, label, why))
+            try:
+                os.remove(out + '.part')
+            except OSError:
+                pass
+            print('[%d/%d] Failed: @%s (%s) - %s' % (n, t, user, label, why), flush=True)
+
+
+def get_work():
+    with LOCK:
+        if Q2:
+            return ('shot', Q2.popleft())
+        if Q1:
+            ACTIVE[0] += 1
+            return ('user', Q1.popleft())
+        if ACTIVE[0] > 0:
+            return ('wait', None)
+        return None
+
+
+def worker(port):
+    holder = {'tab': None}
+
+    def get_tab():
+        if holder['tab'] is None:
+            holder['tab'] = Tab(port)
+        return holder['tab']
+
+    def drop_tab():
+        if holder['tab'] is not None:
+            try:
+                holder['tab'].close()
+            except Exception:
+                pass
+            holder['tab'] = None
+
+    def run(fn):
+        last = None
+        for attempt in (1, 2):
+            if STOP.is_set():
+                raise Fail('ruk gaya')
+            try:
+                return fn()
+            except Fail as e:
+                if not e.retry or attempt == 2:
+                    raise
+                last = e
+            except Exception as e:
+                drop_tab()
+                last = Fail(('%s: %s' % (type(e).__name__, e))[:80])
+                if attempt == 2:
+                    raise last
+        raise last
+
+    def do_shot(user, lb, out):
+        base = 'https://www.youtube.com/@%s' % user
+
+        def one():
+            t = get_tab()
+            st = t.load(base + PATHS[lb], False)
+            sel = selected_labels(st)
+            if lb != 'home' and sel and lb not in sel:
+                raise Fail('ye section channel me nahi hai', kind='missing')
+            if VERBOSE:
+                with LOCK:
+                    print('  [debug] @%s %s selected=%s' % (user, lb, sorted(sel)), flush=True)
+            t.capture(user, lb, out)
+
+        try:
+            run(one)
+            report(user, lb, out, 'ok', '')
+        except Fail as e:
+            report(user, lb, out, e.kind, e.msg)
+
+    def do_user(item):
+        user, todo = item
+        base = 'https://www.youtube.com/@%s' % user
+        need_detect = any(lb != 'home' for lb, _ in todo)
+        avail = None
+        try:
+            st = run(lambda: get_tab().load(base, need_detect))
+        except Fail as e:
+            for lb, out in todo:
+                report(user, lb, out, 'fail', e.msg)
+            return
+        if need_detect:
+            avail = available_labels(st)
+            order = [x for x in ALL_LABELS if x in avail]
+            with LOCK:
+                print('@%s me sections: %s' % (user, ', '.join(order) if order else '(koi nahi)'), flush=True)
+
+        # Home: abhi khula page hi Home hai, seedha screenshot
+        for lb, out in todo:
+            if lb != 'home':
+                continue
+            if avail is not None and 'home' not in avail:
+                report(user, lb, out, 'missing', 'ye section channel me nahi hai')
+                continue
+            try:
+                get_tab().capture(user, 'home', out)
+                report(user, lb, out, 'ok', '')
+            except Fail as e:
+                if e.retry:
+                    with LOCK:
+                        Q2.appendleft((user, lb, out))
+                else:
+                    report(user, lb, out, e.kind, e.msg)
+            except Exception:
+                drop_tab()
+                with LOCK:
+                    Q2.appendleft((user, lb, out))
+
+        # Baaki sections: jo channel me hain unhe parallel queue me daalo
+        for lb, out in todo:
+            if lb == 'home':
+                continue
+            if avail is not None and lb not in avail:
+                report(user, lb, out, 'missing', 'ye section channel me nahi hai')
+            else:
+                with LOCK:
+                    Q2.append((user, lb, out))
+
+    while not STOP.is_set():
+        w = get_work()
+        if w is None:
+            break
+        kind, item = w
+        if kind == 'wait':
+            time.sleep(0.05)
+            continue
+        if kind == 'shot':
+            try:
+                do_shot(*item)
+            except Exception as e:
+                drop_tab()
+                report(item[0], item[1], item[2], 'fail', ('%s: %s' % (type(e).__name__, e))[:80])
+        else:
+            try:
+                do_user(item)
+            except Exception as e:
+                drop_tab()
+                for lb, out in item[1]:
+                    pass
+            finally:
+                with LOCK:
+                    ACTIVE[0] -= 1
+    drop_tab()
+
+
+def table(title, rows):
+    heads = ('No', 'Username', 'Section', 'Kaaran')
+    data = [(str(i + 1),) + r for i, r in enumerate(rows)]
+    ws = [max(len(heads[k]), *(len(r[k]) for r in data)) for k in range(4)]
+    border = '+' + '+'.join('-' * (w + 2) for w in ws) + '+'
+    fmt = lambda r: '| ' + ' | '.join(r[k].ljust(ws[k]) for k in range(4)) + ' |'
+    print()
+    print(title)
+    print(border)
+    print(fmt(heads))
+    print(border)
+    for r in data:
+        print(fmt(r))
+    print(border)
+
+
+def file_hash(path):
+    try:
+        with open(path, 'rb') as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except OSError:
+        return None
+
+
+def main():
+    work = []
+    skipped = 0
+    total = 0
+    for u in USERS:
+        HASHES[u] = {}
+        for lb in ALL_LABELS:
+            if FORCE and lb in LABELS:
+                continue
+            fp = fpath(u, lb)
+            if os.path.isfile(fp) and os.path.getsize(fp) > 0:
+                hh = file_hash(fp)
+                if hh:
+                    HASHES[u].setdefault(hh, lb)
+        todo = []
+        for lb in LABELS:
+            out = fpath(u, lb)
+            if os.path.isfile(out) and os.path.getsize(out) > 0 and not FORCE:
+                skipped += 1
+                print('Skip (pehle se hai): ' + out, flush=True)
+                continue
+            todo.append((lb, out))
+        if todo:
+            work.append((u, todo))
+            total += len(todo)
+            USER_LEFT[u] = len(todo)
+    for b in BAD:
+        FAILS.append((b, '-', 'valid username nahi'))
+        print('Failed: %r (valid username nahi)' % b, flush=True)
+
+    interrupted = False
+    p = None
+    if work:
+        STATS['total'] = total
+        for w in work:
+            Q1.append(w)
+        try:
+            p, port = start_browser()
+        except Fail as e:
+            print('Error: browser start nahi hua: ' + e.msg, file=sys.stderr)
+            shutil.rmtree(PROF, ignore_errors=True)
+            return 2
+        nthreads = max(1, min(JOBS, total))
+        threads = [threading.Thread(target=worker, args=(port,), daemon=True) for _ in range(nthreads)]
+        for t in threads:
+            t.start()
+        try:
+            while any(t.is_alive() for t in threads):
+                time.sleep(0.1)
+        except KeyboardInterrupt:
+            interrupted = True
+            STOP.set()
+            print('\nStopping...', flush=True)
+        finally:
+            kill_browser(p)
+            shutil.rmtree(PROF, ignore_errors=True)
+
+    if interrupted:
+        with LOCK:
+            left = [u for u, n in USER_LEFT.items() if n > 0]
+        if left:
+            with open(STOPLOG, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(left) + '\n')
+            print('Bache hue users %s me save hain (dobara: yt-screenshot %s)' % (STOPLOG, STOPLOG))
+
+    print()
+    print('Done: %d | Skipped: %d | Section nahi hai: %d | Duplicate: %d | Failed: %d'
+          % (STATS['ok'], skipped, len(MISSING), len(DUPS), len(FAILS)))
+    if MISSING:
+        table('Section nahi hai (screenshot nahi banaya):', MISSING)
+    if DUPS:
+        table('Duplicate (save nahi kiya):', DUPS)
+    if FAILS:
+        table('Failed users:', FAILS)
+        names = list(dict.fromkeys(x[0] for x in FAILS if x[1] != '-'))
+        if names:
+            with open(FAILLOG, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(names) + '\n')
+            print("(failed users '%s' me save hain)" % FAILLOG)
+    else:
+        try:
+            os.remove(FAILLOG)
+        except OSError:
+            pass
+    if interrupted:
+        return 130
+    return 1 if FAILS else 0
+
+
+try:
+    code = main()
+except KeyboardInterrupt:
+    code = 130
+sys.exit(code)
+PYEOF
+    rc=$?
+    rm -rf -- "$profile" "$ufile" "$bfile"
+    return $rc
+}
+
+
+
+
+
+
+
+
+
+
+#yt-download-playlist-all
+yt-download-playlist-all () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-download-playlist-all [options] <input> [input2 ...]
+
+Playlist/channel ke videos MP4 me download karta hai, sirf wahi jinki
+duration min se max ke beech ho. Video + audio dono aate hain.
+Quality poochta hai. Chuni hui quality na mile to usse ek neeche wali
+(phir usse neeche) download hoti hai, video skip nahi hota.
+
+Options:
+  -q, --quality Q  Quality: 1|480, 2|720, 3|1080, 4|best (na do to menu se poochega)
+  -m, --min D      Minimum duration (jaise 11s, 5m, 1m44s, 1h15s, ya seedha seconds)
+  -M, --max D      Maximum duration (jaise 55s, 30m, 2h, 1h2m10s)
+  -d, --dir DIR    Is folder me save karo (default: current folder)
+  -N, --frags N    Ek video ke kitne fragments ek saath (default: 10, max 32)
+  -h, --help       Ye help
+  (-m/-M na do to poochega. Enter dabane par koi limit nahi)
+
+Quality menu:
+  1) Medium (480p)   2) High (720p)   3) HD (1080p)   4) Ultra HD (best)  [Enter = 4]
+
+Input:
+  1. Playlist URL      2. Channel URL (@name/videos)
+  3. Multiple URLs     4. Text file (har line me ek URL, # skip)
+  5. Single video URL  (ye bhi chalega, bina playlist folder ke)
+
+Examples:
+  yt-download-playlist-all -q 720 -m 5m -M 30m "https://youtube.com/playlist?list=PLxxx"
+  yt-download-playlist-all -q 1080 -m 1m -d ~/Videos urls.txt
+
+Save hone ki jagah:
+  <dir>/Channel/Playlist(count)/index - Title.mp4
+  Single video: <dir>/Channel/Title.mp4
+
+Tips:
+  - Jo file pehle se hai dobara download nahi hoti, Ctrl+C ke baad dobara chalao to resume hota hai
+  - Jis video ki duration pata nahi (jaise live), wo skip hota hai
+  - Zaruri: yt-dlp, ffmpeg
+EOF
+        return 0
+    fi
+
+    local min_dur="" max_dur="" outdir="" frags=10 quality="" h="" fmt arg line url tmpl rc=0 failc=0
+    local min_sec=0 max_sec=0 filter
+    local vre='(youtu\.be/|[?&]v=|/shorts/|/live/|/embed/)'
+    local -a opts=() inputs=() args=()
+
+    _ypa_sec() {
+        local v="${1,,}" total=0
+        v="${v// /}"
+        [[ -z "$v" ]] && { echo 0; return 0; }
+        if [[ "$v" =~ ^[0-9]+$ ]]; then echo "$v"; return 0; fi
+        [[ "$v" =~ ^([0-9]+h)?([0-9]+m)?([0-9]+s)?$ ]] || return 1
+        [[ "$v" =~ ([0-9]+)h ]] && total=$(( total + BASH_REMATCH[1] * 3600 ))
+        [[ "$v" =~ ([0-9]+)m ]] && total=$(( total + BASH_REMATCH[1] * 60 ))
+        [[ "$v" =~ ([0-9]+)s ]] && total=$(( total + BASH_REMATCH[1] ))
+        echo "$total"
+    }
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -q|--quality) [[ $# -lt 2 ]] && { echo "Error: $1 ke baad quality do" >&2; unset -f _ypa_sec; return 1; }
+                      quality="$2"; shift 2 ;;
+            -m|--min) [[ $# -lt 2 ]] && { echo "Error: $1 ke baad duration do" >&2; unset -f _ypa_sec; return 1; }
+                      min_dur="$2"; shift 2 ;;
+            -M|--max) [[ $# -lt 2 ]] && { echo "Error: $1 ke baad duration do" >&2; unset -f _ypa_sec; return 1; }
+                      max_dur="$2"; shift 2 ;;
+            -d|--dir) [[ $# -lt 2 ]] && { echo "Error: $1 ke baad folder do" >&2; unset -f _ypa_sec; return 1; }
+                      outdir="$2"; shift 2 ;;
+            -N|--frags)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad number do" >&2; unset -f _ypa_sec; return 1; }
+                [[ "$2" =~ ^[0-9]+$ && "$2" -ge 1 && "$2" -le 32 ]] || { echo "Error: -N 1 se 32 ke beech ho" >&2; unset -f _ypa_sec; return 1; }
+                frags="$2"; shift 2 ;;
+            --) shift; opts+=("$@"); break ;;
+            -*) echo "Error: unknown option '$1' (-h se help dekho)" >&2; unset -f _ypa_sec; return 1 ;;
+            *)  opts+=("$1"); shift ;;
+        esac
+    done
+
+    command -v yt-dlp >/dev/null 2>&1 || { echo "Error: yt-dlp install nahi hai" >&2; unset -f _ypa_sec; return 1; }
+    command -v ffmpeg >/dev/null 2>&1 || { echo "Error: ffmpeg install nahi hai (merge ke liye zaruri)" >&2; unset -f _ypa_sec; return 1; }
+
+    for arg in "${opts[@]}"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                inputs+=("$line")
+            done < "$arg"
+        else
+            inputs+=("$arg")
+        fi
+    done
+
+    if [[ ${#inputs[@]} -eq 0 ]]; then
+        echo "Error: koi valid URL nahi mila" >&2
+        unset -f _ypa_sec
+        return 1
+    fi
+
+    # Quality: flag na ho to menu (galat input par dobara poochega)
+    if [[ -z "$quality" ]]; then
+        if [[ -t 0 ]]; then
+            while true; do
+                echo "Select Quality:"
+                echo "1) Medium (480p)"
+                echo "2) High (720p)"
+                echo "3) HD (1080p)"
+                echo "4) Ultra HD (best available)"
+                read -r -p "Enter option [1-4] (Enter = 4): " quality
+                quality="${quality:-4}"
+                case "${quality,,}" in
+                    1|2|3|4|480|480p|720|720p|1080|1080p|best|max) break ;;
+                    *) echo "Galat option, 1 se 4 ke beech chuno." >&2 ;;
+                esac
+            done
+        else
+            quality="4"
+        fi
+    fi
+    case "${quality,,}" in
+        1|480|480p)   h=480 ;;
+        2|720|720p)   h=720 ;;
+        3|1080|1080p) h=1080 ;;
+        4|best|max)   h="" ;;
+        *) echo "Error: invalid quality '$quality' (1-4, 480, 720, 1080, best)" >&2; unset -f _ypa_sec; return 1 ;;
+    esac
+
+    # height<=H: chuni quality ya uske neeche ki sabse achhi. Kuch na mile to best.
+    if [[ -n "$h" ]]; then
+        fmt="bv*[height<=$h]+ba/b[height<=$h]/bv*+ba/b"
+    else
+        fmt="bv*+ba/b"
+    fi
+
+    if [[ -t 0 ]]; then
+        [[ -z "$min_dur" ]] && read -r -p "Minimum duration (jaise 11s, 5m, 1h15s) [Enter = koi limit nahi]: " min_dur
+        [[ -z "$max_dur" ]] && read -r -p "Maximum duration (jaise 55s, 30m, 2h) [Enter = koi limit nahi]: " max_dur
+    fi
+
+    min_sec=$(_ypa_sec "$min_dur") || { echo "Error: min duration ka format galat hai: $min_dur" >&2; unset -f _ypa_sec; return 1; }
+    max_sec=$(_ypa_sec "$max_dur") || { echo "Error: max duration ka format galat hai: $max_dur" >&2; unset -f _ypa_sec; return 1; }
+    unset -f _ypa_sec
+
+    if (( max_sec > 0 && min_sec > max_sec )); then
+        echo "Error: min duration, max se badi hai" >&2
+        return 1
+    fi
+
+    filter=""
+    (( min_sec > 0 )) && filter="duration >= $min_sec"
+    if (( max_sec > 0 )); then
+        [[ -n "$filter" ]] && filter+=" & "
+        filter+="duration <= $max_sec"
+    fi
+    [[ -n "$filter" ]] && args+=(--match-filter "$filter")
+
+    if [[ -n "$outdir" ]]; then
+        mkdir -p -- "$outdir" || { echo "Error: folder ban nahi paaya: $outdir" >&2; return 1; }
+        outdir="${outdir%/}/"
+    fi
+
+    echo "Starting download... (quality: ${h:+${h}p, kam ho to neeche wali}${h:-best})"
+
+    for url in "${inputs[@]}"; do
+        echo "Processing: $url"
+        if [[ "$url" =~ $vre && "$url" != *list=* ]]; then
+            tmpl="${outdir}%(channel,uploader|Unknown Channel)s/%(title).200B.%(ext)s"
+        else
+            tmpl="${outdir}%(channel,uploader|Unknown Channel)s/%(playlist|Unknown Playlist)s(%(playlist_count|?)s)/%(playlist_index)s - %(title).200B.%(ext)s"
+        fi
+        yt-dlp \
+            -f "$fmt" \
+            --merge-output-format mp4 \
+            --concurrent-fragments "$frags" \
+            --no-overwrites --ignore-errors --no-warnings --newline \
+            "${args[@]}" \
+            -o "$tmpl" \
+            -- "$url" < /dev/null
+        rc=$?
+        if (( rc != 0 )); then
+            failc=$(( failc + 1 ))
+            echo "Failed: $url (exit code $rc)" >&2
+        fi
+    done
+
+    echo
+    echo "Khatam. Failed URLs: $failc"
+    (( failc == 0 ))
+}
+
+
+
+
+
+
+
+
+
+#yt-json-username_name_count
+yt-json-username_name_count () 
+{ 
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: lc [options] [file|folder|word ...]
+
+Usernames/words ki ginti karta hai.
+  Filter na do  : har pehle character ke kitne naam hain (a-z, 0-9, special
+                  character jaise _ . -, aur baaki sab jaise Hindi/emoji),
+                  zyada ginti wale pehle
+  Filter do     : har filter (prefix ya regex) se kitne naam match hote hain
+
+JSON support:
+  yt-comment-download se bani .info.json file (ya folder) do, to comment
+  karne walon ke naam apne aap nikal kar ginti hoti hai.
+  JSON me default me har user ek baar gina jaata hai (-A se har comment gino).
+
+Options:
+  -p, --pattern F   Filter (space se alag multiple, ya -p baar-baar)
+  -a, --all         Filter mat poochho, seedha pehle-character ginti
+  -u, --unique      Same naam ek hi baar gino (text file ke liye)
+  -A, --all-comments  JSON me har comment gino (same user baar-baar)
+  -l, --literal     Filter ko hamesha prefix maano (regex nahi)
+  -h, --help        Ye help
+
+Input (kuch bhi mix kar sakte ho):
+  1. Text file (har line me ek naam, # skip)   lc users.txt
+  2. JSON file                                 lc "video.info.json"
+  3. Folder (andar ki saari .json files)       lc ~/comments
+  4. Direct words / usernames                  lc sohan mohan @king
+  5. Pipe se                                   cat users.txt | lc -a
+  6. Kuch na do to menu poochega
+
+Examples:
+  lc -a *.info.json
+  lc -p "a b sh" ~/comments
+  lc -A -a video.info.json
+EOF
+        return 0
+    fi
+
+    local tmp arg w f choice file filter="" have_filter=0 allf=0 uniq=0 lit=0
+    local allc=0 hasjson=0 p rc=0 typed
+    local -a words=() files=() pats=() good=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -p|--pattern)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad filter do" >&2; return 1; }
+                filter+=" $2"; have_filter=1; shift 2 ;;
+            -a|--all) allf=1; shift ;;
+            -u|--unique) uniq=1; shift ;;
+            -A|--all-comments) allc=1; shift ;;
+            -l|--literal) lit=1; shift ;;
+            --) shift; for arg in "$@"; do if [[ -e "$arg" ]]; then files+=("$arg"); else words+=("$arg"); fi; done; break ;;
+            -*) echo "Error: unknown option '$1' (-h se help dekho)" >&2; return 1 ;;
+            *)
+                if [[ -e "$1" ]]; then
+                    files+=("$1")
+                elif [[ "$1" == */* || "${1,,}" == *.txt || "${1,,}" == *.csv || "${1,,}" == *.list || "${1,,}" == *.json ]]; then
+                    echo "Error: file nahi mili: $1" >&2; return 1
+                else
+                    words+=("$1")
+                fi
+                shift ;;
+        esac
+    done
+
+    tmp=$(mktemp) || { echo "Error: temp file nahi ban paayi" >&2; return 1; }
+
+    _lc_add() {
+        local fl="$1" c
+        c=$(head -c 4096 -- "$fl" 2>/dev/null | tr -d ' \t\r\n' | head -c 1)
+        if [[ "${fl,,}" == *.json || "$c" == "{" || "$c" == "[" ]]; then
+            if ! command -v jq >/dev/null 2>&1; then
+                echo "Error: JSON ke liye jq chahiye (install karo)" >&2; return 1
+            fi
+            hasjson=1
+            if ! jq -r 'if type=="object" then (.comments // [])[]? else .[]? end
+                        | (.author // empty) | tostring | gsub("[\r\n]"; " ")' "$fl" >> "$tmp" 2>/dev/null; then
+                echo "Failed: $fl (JSON padh nahi paaya)" >&2
+            fi
+        else
+            tr -d '\r' < "$fl" >> "$tmp"
+            printf '\n' >> "$tmp"
+        fi
+    }
+
+    for arg in "${files[@]}"; do
+        if [[ -d "$arg" ]]; then
+            while IFS= read -r -d '' f; do
+                _lc_add "$f"
+            done < <(find "$arg" -type f -name '*.json' -print0 2>/dev/null | sort -z)
+        else
+            _lc_add "$arg"
+        fi
+    done
+    for w in "${words[@]}"; do printf '%s\n' "$w" >> "$tmp"; done
+
+    if [[ ${#files[@]} -eq 0 && ${#words[@]} -eq 0 ]]; then
+        if [[ ! -t 0 ]]; then
+            tr -d '\r' >> "$tmp"
+        else
+            echo "Input source choose karo:"
+            echo "1) Direct words / usernames"
+            echo "2) File / folder se read karna (text ya JSON)"
+            read -r -p "Choice [1/2]: " choice
+            if [[ "$choice" == "1" ]]; then
+                read -r -p "Words / usernames likho: " typed
+                for w in $typed; do printf '%s\n' "$w" >> "$tmp"; done
+            elif [[ "$choice" == "2" ]]; then
+                read -r -p "File / folder ka naam likho: " file
+                [[ -e "$file" ]] || { echo "Error: nahi mila: $file" >&2; rm -f "$tmp"; unset -f _lc_add; return 1; }
+                if [[ -d "$file" ]]; then
+                    while IFS= read -r -d '' f; do _lc_add "$f"; done \
+                        < <(find "$file" -type f -name '*.json' -print0 2>/dev/null | sort -z)
+                else
+                    _lc_add "$file"
+                fi
+            else
+                echo "Error: galat choice, 1 ya 2 likho" >&2
+                rm -f "$tmp"; unset -f _lc_add; return 1
+            fi
+        fi
+    fi
+    unset -f _lc_add
+
+    if [[ ! -s "$tmp" ]]; then
+        echo "Error: koi naam nahi mila (JSON me comments hain? file sahi hai?)" >&2
+        rm -f "$tmp"; return 1
+    fi
+
+    [[ $hasjson -eq 1 && $allc -eq 0 ]] && uniq=1
+
+    if [[ $have_filter -eq 0 && $allf -eq 0 && -t 0 ]]; then
+        echo
+        read -r -p "Filter / regex do (space separated, blank = all): " filter
+    fi
+    filter="${filter,,}"
+    read -r -a pats <<< "$filter"
+    [[ $allf -eq 1 ]] && pats=()
+
+    local prep='
+    function prep(s) {
+        sub(/\r$/, "", s)
+        gsub(/^[ \t]+|[ \t]+$/, "", s)
+        if (s == "" || s ~ /^#/) return ""
+        if (s ~ /^[0-9]+[ \t]+@/) sub(/^[0-9]+[ \t]+/, "", s)
+        sub(/^@/, "", s)
+        return tolower(s)
+    }'
+
+    echo "Total naam: $(grep -c . "$tmp")$([[ $uniq -eq 1 ]] && echo " (har naam ek baar gina jayega)")"
+
+    if [[ ${#pats[@]} -eq 0 ]]; then
+        # ---- Pehle character ki ginti: a-z, 0-9, special, aur baaki sab ----
+        if ! command -v python3 >/dev/null 2>&1; then
+            echo "Error: python3 chahiye (special/Unicode characters ginne ke liye)" >&2
+            rm -f "$tmp"; return 1
+        fi
+        U="$uniq" python3 - "$tmp" <<'PYEOF'
+import os, re, sys, string
+uniq = os.environ.get('U') == '1'
+cnt = {c: 0 for c in string.ascii_lowercase + string.digits}
+seen = set()
+with open(sys.argv[1], encoding='utf-8', errors='replace') as f:
+    for line in f:
+        s = line.strip()
+        if not s or s.startswith('#'):
+            continue
+        s = re.sub(r'^[0-9]+\s+@', '@', s)
+        if s.startswith('@'):
+            s = s[1:]
+        s = s.lower()
+        if not s:
+            continue
+        if uniq:
+            if s in seen:
+                continue
+            seen.add(s)
+        c = s[0]
+        cnt[c] = cnt.get(c, 0) + 1
+out = sys.stdout
+try:
+    out.reconfigure(encoding='utf-8')
+except Exception:
+    pass
+for c, n in sorted(cnt.items(), key=lambda kv: (-kv[1], kv[0])):
+    out.write('%s [%d]\n' % (c, n))
+PYEOF
+        rc=$?
+    else
+        for p in "${pats[@]}"; do
+            if [[ $lit -eq 0 ]] && ! P="$p" awk 'BEGIN { "" ~ ENVIRON["P"] }' 2>/dev/null; then
+                echo "Error: galat regex, skip: $p" >&2
+                rc=1
+                continue
+            fi
+            good+=("$p")
+        done
+        if [[ ${#good[@]} -gt 0 ]]; then
+            U="$uniq" L="$lit" PATS="${good[*]}" awk "$prep"'
+            function isre(p) {
+                return (index(p,"^") || index(p,".") || index(p,"*") || index(p,"$") || index(p,"+") ||
+                        index(p,"?") || index(p,"[") || index(p,"]") || index(p,"(") || index(p,")") ||
+                        index(p,"|") || index(p,"\\") || index(p,"{"))
+            }
+            BEGIN {
+                U = ENVIRON["U"] + 0; L = ENVIRON["L"] + 0
+                np = split(ENVIRON["PATS"], pat, " ")
+                for (i = 1; i <= np; i++) { cnt[i] = 0; re[i] = (!L && isre(pat[i])) }
+            }
+            {
+                n = prep($0)
+                if (n == "") next
+                if (U && seen[n]++) next
+                for (i = 1; i <= np; i++) {
+                    if (re[i]) { if (n ~ pat[i]) cnt[i]++ }
+                    else if (index(n, pat[i]) == 1) cnt[i]++
+                }
+            }
+            END { for (i = 1; i <= np; i++) printf "%s [%d]\n", pat[i], cnt[i] }' "$tmp"
+        fi
+    fi
+
+    rm -f "$tmp"
+    return $rc
+}
+
+
+
+
+
+
+
+
+
+
+#yt-json-chapter
+yt-json-chapter() {
+  jq -r '
+  def pad2: 
+    tostring | if length == 1 then "0"+. else . end;
+
+  def hms:
+    . as $sec |
+    ($sec / 3600 | floor) as $h |
+    (($sec % 3600) / 60 | floor) as $m |
+    ($sec % 60 | floor) as $s |
+    ($h|pad2) + ":" + ($m|pad2) + ":" + ($s|pad2);
+
+  def duration:
+    . as $sec |
+    ($sec / 3600 | floor) as $h |
+    (($sec % 3600) / 60 | floor) as $m |
+    ($sec % 60 | floor) as $s |
+    (if $h > 0 then ($h|tostring)+"h" else "" end) +
+    (if $m > 0 then ($m|tostring)+"m" else "" end) +
+    (if $s > 0 then ($s|tostring)+"s" else "" end);
+
+  (
+    ["start time","end time","total time","chapter name"],
+    ["----------","--------","----------","-------------"],
+    (
+      .chapters[] |
+      (.end_time - .start_time) as $dur |
+      [(.start_time|hms), (.end_time|hms), ($dur|duration), .title]
+    )
+  ) | @tsv
+  ' "$1" | column -t -s $'\t'
+}
+
+
+
+
+
+
+
+
+
+
+#yt-youtuber-full_length
+_ytfl_split () {
+    awk -v total="$1" 'BEGIN {
+        y = int(total / (365.25*86400)); total -= y * 365.25*86400
+        mo = int(total / (30.44*86400)); total -= mo * 30.44*86400
+        d = int(total / 86400); total -= d * 86400
+        h = int(total / 3600); total -= h * 3600
+        mi = int(total / 60); total -= mi * 60
+        printf "%d Year : %d Month : %d Days : %d Hours : %d Minutes : %d Seconds", y, mo, d, h, mi, int(total)
+    }'
+}
+
+_ytfl_block () {   # title channel section vids secs
+    echo "================ $1 ================"
+    echo "Channel        : $2"
+    [[ -n "$3" ]] && echo "Section        : $3"
+    echo "Total videos   : $4"
+    echo "Watch time     : $(_ytfl_split "$5")"
+    echo "=========================================="
+}
+
+_ytfl_name () {
+    case "$1" in
+        videos) echo Videos ;; shorts) echo Shorts ;; streams) echo Live ;;
+        podcasts) echo Podcasts ;; playlists) echo Playlists ;;
+        courses) echo Courses ;; releases) echo Releases ;; *) echo "$1" ;;
+    esac
+}
+
+_ytfl_norm () {
+    case "${1,,}" in
+        videos|video) echo videos ;; shorts|short) echo shorts ;;
+        live|streams|stream) echo streams ;; podcasts|podcast) echo podcasts ;;
+        playlists|playlist) echo playlists ;; courses|course) echo courses ;;
+        releases|release) echo releases ;; *) echo "" ;;
+    esac
+}
+
+# Background me chal rahe fetch band karo
+_ytfl_killall () {
+    local p
+    [[ -n "$tmp" && -f "$tmp/pids" ]] || return 0
+    for p in $(<"$tmp/pids"); do
+        pkill -P "$p" 2>/dev/null
+        kill "$p" 2>/dev/null
+    done
+}
+
+# stdin: id<TAB>duration ...   stdout: "n missing seconds"
+_ytfl_stream () {   # outfile label tty
+    awk -F'\t' -v out="$1" -v lab="$2" -v tty="$3" '
+    function fmt(x) { return sprintf("%dh %02dm %02ds", int(x/3600), int((x%3600)/60), int(x%60)) }
+    NF >= 1 && $1 != "" && !seen[$1]++ {
+        n++
+        if ($2 ~ /^[0-9]+(\.[0-9]+)?$/) s += $2; else m++
+        print $1 "\t" $2 >> out
+        if (tty == 1 && n % 5 == 0) printf "\r  %s: %d videos | %s   ", lab, n, fmt(s) > "/dev/stderr"
+    }
+    END {
+        if (tty == 1) printf "\r\033[K" > "/dev/stderr"
+        printf "%d %d %d\n", n + 0, m + 0, int(s + 0.5)
+    }'
+}
+
+# Background me bani list ka intezaar (live counter ke saath), phir ginti
+_ytfl_collect () {   # rawfile outfile label  -> _YTFL_RES
+    local raw="$1" o="$2" lab="$3" c n s
+    while [[ ! -e "$raw.done" ]]; do
+        (( interrupted )) && return 0
+        if (( ${tty:-0} == 1 )); then
+            c=$(awk -F'\t' '$1 != "" { n++; if ($2 ~ /^[0-9]+(\.[0-9]+)?$/) s += $2 } END { printf "%d %d", n + 0, s + 0 }' "$raw" 2>/dev/null)
+            read -r n s <<< "$c"
+            printf '\r  %s: %d videos | %dh %02dm %02ds   ' "$lab" "${n:-0}" $(( ${s:-0} / 3600 )) $(( (${s:-0} % 3600) / 60 )) $(( ${s:-0} % 60 )) >&2
+        fi
+        sleep 0.4
+    done
+    (( ${tty:-0} == 1 )) && printf '\r\033[K' >&2
+    _YTFL_RES=$(_ytfl_stream "$o" "" 0 < "$raw")
+    [[ -z "$_YTFL_RES" ]] && _YTFL_RES="0 0 0"
+}
+
+# Ek pass: ids ki duration nikalo (par process ek saath, bn videos har process me)
+_ytfl_pass () {   # listfile resfile par bn total [extra yt-dlp args...]
+    local list="$1" res="$2" par="$3" bn="$4" tot="$5"
+    shift 5
+    local fmt=$'%(id)s\t%(duration)s'
+    sed 's#^#https://www.youtube.com/watch?v=#' "$list" \
+        | PYTHONUNBUFFERED=1 xargs -P "$par" -n "$bn" \
+            yt-dlp --skip-download --no-warnings --ignore-errors --ignore-no-formats-error \
+            --socket-timeout 20 "$@" --print "$fmt" 2>/dev/null \
+        | awk -v out="$res" -v tot="$tot" -v tty="${tty:-0}" '
+            { print >> out; n++
+              if (tty == 1) { printf "\r  duration mili: %d/%d   ", n, tot > "/dev/stderr"; fflush("/dev/stderr") } }
+            END { if (tty == 1) printf "\r\033[K" > "/dev/stderr" }'
+}
+
+# Jin videos ki duration list me nahi aayi (Shorts me aam hai), unki duration alag se nikalo
+_ytfl_fill () {   # idsfile
+    local file="$1" miss res miss2 cnt cnt2 par="${ytfl_par:-16}"
+    miss="$file.miss"; res="$file.res"; miss2="$file.miss2"
+    awk -F'\t' 'NF && $1 != "" && $2 !~ /^[0-9]+(\.[0-9]+)?$/ { print $1 }' "$file" > "$miss"
+    cnt=$(grep -c . "$miss")
+    if (( cnt == 0 )); then rm -f "$miss"; return 0; fi
+    echo "  $cnt video(s) ki duration list me nahi thi, tez tareeke se nikal rahe hain..."
+    : > "$res"
+
+    # Pass 1: halka tareeka, bahut parallel
+    _ytfl_pass "$miss" "$res" "$par" 10 "$cnt" \
+        --extractor-args "youtube:player_client=android_vr;player_skip=webpage,configs"
+
+    # Pass 2: jo bache, unhe normal tareeke se
+    awk -F'\t' 'FILENAME == ARGV[1] { if ($2 ~ /^[0-9]+(\.[0-9]+)?$/) d[$1] = 1; next }
+                $1 != "" && !($1 in d) { print $1 }' "$res" "$miss" > "$miss2"
+    cnt2=$(grep -c . "$miss2")
+    if (( cnt2 > 0 && ! interrupted )); then
+        echo "  $cnt2 video(s) normal tareeke se dobara try ho rahe hain..."
+        _ytfl_pass "$miss2" "$res" 8 3 "$cnt2"
+    fi
+
+    awk -F'\t' 'FILENAME == ARGV[1] { if ($2 ~ /^[0-9]+(\.[0-9]+)?$/) d[$1] = $2; next }
+                { if (($1 in d)) $2 = d[$1]; print $1 "\t" $2 }' "$res" "$file" > "$file.new" \
+        && mv -f -- "$file.new" "$file"
+    rm -f -- "$miss" "$miss2" "$res" "$file.new"
+}
+
+_ytfl_fetch () {   # url outfile label  -> _YTFL_RES
+    _YTFL_RES=$(PYTHONUNBUFFERED=1 yt-dlp --flat-playlist --no-warnings --ignore-errors \
+        --print $'%(id)s\t%(duration)s' -- "$1" </dev/null 2>/dev/null \
+        | _ytfl_stream "$2" "$3" "${tty:-0}")
+    [[ -z "$_YTFL_RES" ]] && _YTFL_RES="0 0 0"
+}
+
+# Playlists / Podcasts / Courses / Releases: tab ki har playlist ke videos
+_ytfl_multi () {   # tabUrl outfile label dir  -> _YTFL_RES
+    local url="$1" out="$2" dir="$4" p i=0 total par="${ytfl_pl:-8}"
+    local -a pls=()
+    mkdir -p -- "$dir"; rm -f "$dir"/pl.* 2>/dev/null
+    while IFS= read -r p; do
+        [[ "$p" == http* ]] && pls+=("$p")
+    done < <(yt-dlp --flat-playlist --no-warnings --ignore-errors --print '%(url)s' -- "$url" </dev/null 2>/dev/null | awk '!s[$0]++')
+    total=${#pls[@]}
+    if (( total == 0 )); then _YTFL_RES="0 0 0"; return 0; fi
+    echo "  $total playlist mili, videos nikal rahe hain..."
+    (
+        for p in "${pls[@]}"; do
+            (( interrupted )) && break
+            i=$(( i + 1 ))
+            while (( $(jobs -rp | wc -l) >= par )); do wait -n 2>/dev/null || sleep 0.2; done
+            (
+                f="$dir/pl.$i"
+                PYTHONUNBUFFERED=1 yt-dlp --flat-playlist --no-warnings --ignore-errors \
+                    --print $'%(id)s\t%(duration)s\t%(playlist_title)s' -- "$p" </dev/null 2>/dev/null > "$f"
+                line=$(awk -F'\t' 'NF && $1 != "" && !s[$1]++ { n++; if ($2 ~ /^[0-9]+(\.[0-9]+)?$/) t += $2; if (n == 1) ti = $3 }
+                    END { if (n == 0) print "(khaali / nahi mili)"; else printf "%s: %d videos | %dh %02dm %02ds", ti, n, int(t/3600), int((t%3600)/60), int(t%60) }' "$f")
+                printf '  [%d/%d] %s\n' "$i" "$total" "$line"
+            ) &
+        done
+        wait
+    )
+    _YTFL_RES=$(cat "$dir"/pl.* 2>/dev/null | _ytfl_stream "$out" "" 0)
+    [[ -z "$_YTFL_RES" ]] && _YTFL_RES="0 0 0"
+}
+
+# total mode: multi section background me chalao, aakhir me marker file banao
+_ytfl_multi_bg () {   # tabUrl outfile label dir
+    _ytfl_multi "$@" >/dev/null 2>&1
+    : > "$2.mdone"
+}
+
+# Section hai ya nahi: yes | empty | no | nochan | err
+_ytfl_probe () {   # url resultfile
+    local out rc t
+    for t in 1 2; do
+        out=$(yt-dlp --flat-playlist --no-warnings --playlist-items 1 --print '%(id)s' -- "$1" </dev/null 2>"$2.err")
+        rc=$?
+        if [[ -n "$out" ]]; then echo yes > "$2"; return 0; fi
+        if (( rc == 0 )); then echo empty > "$2"; return 0; fi
+        if grep -qiE 'does not have|no .* tab' "$2.err" 2>/dev/null; then echo no > "$2"; return 0; fi
+        if grep -qiE 'does not exist|404|not found|terminated|unavailable' "$2.err" 2>/dev/null; then echo nochan > "$2"; return 0; fi
+    done
+    echo err > "$2"
+}
+
+_ytfl_run () {
+    local chan_re='^(https?://(www\.|m\.)?youtube\.com/(@[^/?#]+|channel/[^/?#]+|c/[^/?#]+|user/[^/?#]+))(/([a-z]+))?/?([?#].*)?$'
+    local item h base label tab tabsec mode s sec name ans tok ok sout n m tsec st_s any_nochan url mn i raw comb secnames
+    local -a psecs=() avail=() missing=() chosen=() chfiles=() secsdone=()
+    local -A st=() pick=()
+    local -a ALLSECS=(videos shorts streams podcasts playlists courses releases)
+
+    for item in "${inputs[@]}"; do
+        (( interrupted )) && break
+        cidx=$(( cidx + 1 ))
+        totalmode=$totalflag
+        mode=""; base=""; label="$item"; url="$item"; tabsec=""
+        if [[ "$item" =~ ^https?:// ]]; then
+            if [[ "$item" =~ $chan_re ]]; then
+                base="${BASH_REMATCH[1]}"; tab="${BASH_REMATCH[5]}"; label="${base#*youtube.com/}"
+                if [[ -z "$tab" ]]; then
+                    mode=channel
+                else
+                    tabsec=$(_ytfl_norm "$tab")
+                    if [[ -n "$tabsec" ]]; then mode=tab; else mode=direct; fi
+                fi
+            else
+                mode=direct
+            fi
+        else
+            h="${item#@}"; h="${h//[^[:alnum:]_.-]/}"
+            if [[ -z "$h" ]]; then
+                echo "Failed: '$item' (valid handle nahi)" >&2; failc=$(( failc + 1 )); continue
+            fi
+            base="https://www.youtube.com/@$h"; label="@$h"; mode=channel
+        fi
+
+        chosen=(); chfiles=(); secsdone=()
+        echo
+        if [[ "$mode" == direct ]]; then
+            chosen=(direct); totalmode=0
+        elif [[ "$mode" == tab ]]; then
+            chosen=("$tabsec"); totalmode=0
+        else
+            psecs=("${ALLSECS[@]}")
+            (( selgiven && ! wall )) && psecs=("${wsecs[@]}")
+            echo "$label ke sections check ho rahe hain..."
+            (
+                for s in "${psecs[@]}"; do
+                    _ytfl_probe "$base/$s" "$tmp/p.$cidx.$s" &
+                done
+                wait
+            )
+            st=(); avail=(); missing=(); any_nochan=0
+            for s in "${psecs[@]}"; do
+                st_s="err"; [[ -f "$tmp/p.$cidx.$s" ]] && st_s=$(<"$tmp/p.$cidx.$s")
+                st[$s]="$st_s"
+                case "$st_s" in
+                    yes|err) avail+=("$s") ;;
+                    nochan)  any_nochan=1; missing+=("$s") ;;
+                    *)       missing+=("$s") ;;
+                esac
+            done
+            if (( ${#avail[@]} == 0 )); then
+                if (( any_nochan )); then
+                    echo "Failed: $label (channel nahi mila, ya username galat hai)" >&2
+                else
+                    echo "Failed: $label (koi video wala section nahi mila)" >&2
+                fi
+                failc=$(( failc + 1 )); continue
+            fi
+
+            if (( selgiven )); then
+                chosen=("${avail[@]}")
+                if (( ${#missing[@]} )); then
+                    mn=""; for s in "${missing[@]}"; do mn+="$(_ytfl_name "$s") "; done
+                    echo "Nahi mile / khaali: $mn"
+                fi
+            elif [[ -t 0 ]]; then
+                echo "$label ke sections (jinme videos hain):"
+                i=0
+                for s in "${avail[@]}"; do
+                    i=$(( i + 1 ))
+                    if [[ "${st[$s]}" == yes ]]; then
+                        printf '  %d) %s (available)\n' "$i" "$(_ytfl_name "$s")"
+                    else
+                        printf '  %d) %s (available, check adhura)\n' "$i" "$(_ytfl_name "$s")"
+                    fi
+                done
+                echo "  all) Sabhi sections (ek ke baad ek, har ka alag result)"
+                echo "  total) Sabhi sections ka sirf total (sabse tez)"
+                if (( ${#missing[@]} )); then
+                    mn=""; for s in "${missing[@]}"; do mn+="$(_ytfl_name "$s") "; done
+                    echo "Nahi mile / khaali: $mn"
+                fi
+                echo "(Home, Posts, Store me video list nahi hoti, isliye nahi dikhaye)"
+                while true; do
+                    read -r -p "Option chuno (jaise 2  ya  1,3  ya  all  ya  total) [Enter = all]: " ans || { ans="all"; }
+                    ans="${ans,,}"; ans="${ans// /}"
+                    pick=(); ok=1; totalmode=$totalflag
+                    if [[ -z "$ans" || "$ans" == all || "$ans" == a ]]; then
+                        for s in "${avail[@]}"; do pick[$s]=1; done
+                    else
+                        for tok in ${ans//,/ }; do
+                            if [[ "$tok" == all || "$tok" == a ]]; then
+                                for s in "${avail[@]}"; do pick[$s]=1; done
+                            elif [[ "$tok" == total || "$tok" == t ]]; then
+                                totalmode=1
+                                for s in "${avail[@]}"; do pick[$s]=1; done
+                            elif [[ "$tok" =~ ^[0-9]+$ ]] && (( tok >= 1 && tok <= ${#avail[@]} )); then
+                                pick[${avail[tok-1]}]=1
+                            else
+                                sec=$(_ytfl_norm "$tok")
+                                if [[ -n "$sec" && " ${avail[*]} " == *" $sec "* ]]; then pick[$sec]=1; else ok=0; fi
+                            fi
+                        done
+                    fi
+                    (( ok && ${#pick[@]} > 0 )) && break
+                    echo "Galat option, list me se number, naam, all ya total likho." >&2
+                done
+                for s in "${avail[@]}"; do [[ -n "${pick[$s]}" ]] && chosen+=("$s"); done
+            else
+                chosen=("${avail[@]}")
+            fi
+        fi
+
+        # ---- Videos / Shorts / Live ki list sab ek saath background me shuru ----
+        if [[ "$mode" != direct ]]; then
+            for sec in "${chosen[@]}"; do
+                case "$sec" in
+                    videos|shorts|streams)
+                        raw="$tmp/raw.$cidx.$sec"; rm -f "$raw" "$raw.done"
+                        ( (
+                            PYTHONUNBUFFERED=1 yt-dlp --flat-playlist --no-warnings --ignore-errors \
+                                --print $'%(id)s\t%(duration)s' -- "$base/$sec" </dev/null 2>/dev/null > "$raw"
+                            : > "$raw.done"
+                        ) & echo $! >> "$tmp/pids" )
+                        ;;
+                    *)
+                        if (( totalmode )); then
+                            sout="$tmp/ids.$cidx.$sec"; : > "$sout"; rm -f "$sout.mdone"
+                            ( ( _ytfl_multi_bg "$base/$sec" "$sout" "" "$tmp/m.$cidx.$sec" ) & echo $! >> "$tmp/pids" )
+                        fi
+                        ;;
+                esac
+            done
+        fi
+
+        # ================= TOTAL MODE =================
+        if (( totalmode )); then
+            echo "--- $label : total nikal rahe hain ---"
+            secnames=""
+            for sec in "${chosen[@]}"; do
+                (( interrupted )) && break
+                name=$(_ytfl_name "$sec")
+                sout="$tmp/ids.$cidx.$sec"
+                case "$sec" in
+                    videos|shorts|streams)
+                        : > "$sout"
+                        _ytfl_collect "$tmp/raw.$cidx.$sec" "$sout" "$name" ;;
+                    *)
+                        while [[ ! -e "$sout.mdone" ]]; do
+                            (( interrupted )) && break
+                            sleep 0.3
+                        done
+                        (( interrupted )) && break
+                        _YTFL_RES=$(_ytfl_stream /dev/null "" 0 < "$sout")
+                        [[ -z "$_YTFL_RES" ]] && _YTFL_RES="0 0 0" ;;
+                esac
+                (( interrupted )) && break
+                read -r n m tsec <<< "$_YTFL_RES"
+                echo "  $name: ${n:-0} videos mili"
+                if (( ${n:-0} > 0 )); then chfiles+=("$sout"); secnames+="$name, "; fi
+            done
+            (( interrupted )) && break
+            if (( ${#chfiles[@]} == 0 )); then
+                echo "Koi video nahi mila."
+                failc=$(( failc + 1 )); continue
+            fi
+            comb="$tmp/ids.$cidx.total"; : > "$comb"
+            cat "${chfiles[@]}" | _ytfl_stream "$comb" "" 0 >/dev/null
+            _ytfl_fill "$comb"
+            (( interrupted )) && break
+            _YTFL_RES=$(_ytfl_stream /dev/null "" 0 < "$comb")
+            [[ -z "$_YTFL_RES" ]] && _YTFL_RES="0 0 0"
+            read -r n m tsec <<< "$_YTFL_RES"
+            (( m > 0 )) && echo "Note: $m video(s) ki duration nahi mili (live/upcoming/private/delete ho sakte hain), unhe skip kiya gaya."
+            echo "(same video do sections me ho to ek hi baar gina gaya)"
+            echo "================ TOTAL ================"
+            echo "Channel        : $label"
+            echo "Sections       : ${secnames%, }"
+            echo "Total videos   : $n"
+            echo "Total time     : $(_ytfl_split "$tsec")"
+            echo "=========================================="
+            echo
+            chcount=$(( chcount + 1 ))
+            allfiles+=("$comb")
+            continue
+        fi
+
+        # ---- chune hue sections ka calculation (har result turant) ----
+        for sec in "${chosen[@]}"; do
+            (( interrupted )) && break
+            name=""; [[ "$sec" != direct ]] && name=$(_ytfl_name "$sec")
+            sout="$tmp/ids.$cidx.$sec"; : > "$sout"
+            if [[ -n "$name" ]]; then echo "--- $label : $name ---"; else echo "--- $label ---"; fi
+            _YTFL_RES="0 0 0"
+            case "$sec" in
+                direct)   _ytfl_fetch "$url" "$sout" "$label" ;;
+                videos|shorts|streams) _ytfl_collect "$tmp/raw.$cidx.$sec" "$sout" "$name" ;;
+                *)        _ytfl_multi "$base/$sec" "$sout" "$name" "$tmp/m.$cidx.$sec" ;;
+            esac
+            (( interrupted )) && break
+            _ytfl_fill "$sout"
+            (( interrupted )) && break
+            _YTFL_RES=$(_ytfl_stream /dev/null "" 0 < "$sout")
+            [[ -z "$_YTFL_RES" ]] && _YTFL_RES="0 0 0"
+            read -r n m tsec <<< "$_YTFL_RES"
+            if (( ${n:-0} == 0 )); then
+                echo "Is section me koi video nahi mila."
+                [[ "$mode" != channel ]] && failc=$(( failc + 1 ))
+                continue
+            fi
+            (( m > 0 )) && echo "Note: $m video(s) ki duration nahi mili (live/upcoming/private/delete ho sakte hain), unhe skip kiya gaya."
+            _ytfl_block "RESULT" "$label" "$name" "$n" "$tsec"
+            echo
+            chfiles+=("$sout"); secsdone+=("$sec")
+        done
+
+        (( ${#chfiles[@]} == 0 )) && continue
+        chcount=$(( chcount + 1 ))
+        allfiles+=("${chfiles[@]}")
+        if (( ${#chfiles[@]} > 1 )); then
+            _YTFL_RES=$(cat "${chfiles[@]}" | _ytfl_stream /dev/null "" 0)
+            read -r n m tsec <<< "$_YTFL_RES"
+            echo "(same video do sections me ho to ek hi baar gina gaya)"
+            _ytfl_block "CHANNEL TOTAL" "$label" "${#chfiles[@]} sections" "$n" "$tsec"
+            echo
+        fi
+    done
+
+    if (( chcount > 1 && ! interrupted )); then
+        _YTFL_RES=$(cat "${allfiles[@]}" | _ytfl_stream /dev/null "" 0)
+        read -r n m tsec <<< "$_YTFL_RES"
+        _ytfl_block "GRAND TOTAL" "$chcount channels" "" "$n" "$tsec"
+    fi
+}
+
+yt-youtuber-full_length () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-youtuber-full_length [options] <input> [input2 ...]
+
+Channel ya playlist ke videos ki total length (watch time) nikalta hai.
+Video download nahi hota, sirf metadata aata hai.
+
+Channel dene par pehle check hota hai ki kaunse sections me videos hain
+(Videos, Shorts, Live, Podcasts, Playlists, Courses, Releases). Sirf wahi
+menu me aate hain, "(available)" ke saath. Option chuno:
+  2 / 1,3   chune hue sections, har ka alag result turant
+  all       sabhi sections, har ka alag result ek ke baad ek
+  total     sabhi sections ka sirf ek combined total (sabse tez)
+
+Tez chalne ke liye: sab sections ki list ek saath aati hai, aur Shorts jaise
+sections me jahan YouTube list me duration nahi deta, wahan 16 ek saath nikalti hai.
+
+Options:
+  -s, --section S   Menu skip karo. Naam comma se: videos,shorts,live,podcasts,
+                    playlists,courses,releases, ya all, ya total
+  -h, --help        Ye help
+
+Input:
+  1. Channel handle        yt-youtuber-full_length @name
+  2. Channel URL           yt-youtuber-full_length "https://youtube.com/@name"
+  3. Section ka URL        yt-youtuber-full_length "https://youtube.com/@name/shorts"
+  4. Playlist URL          yt-youtuber-full_length "https://youtube.com/playlist?list=PLxxx"
+  5. Multiple / text file  yt-youtuber-full_length @a @b   |   channels.txt (har line me ek, # skip)
+
+Examples:
+  yt-youtuber-full_length @name
+  yt-youtuber-full_length -s videos,shorts @name
+  yt-youtuber-full_length -s total @name
+  ytfl_par=24 yt-youtuber-full_length -s shorts @name     (shorts ke liye zyada parallel)
+
+Tips:
+  - YouTube rate-limit de to ytfl_par=8 ytfl_pl=4 se kam karo
+  - Home, Posts, Store me video list nahi hoti, isliye ye options nahi aate
+  - Same video do sections me ho to total me ek hi baar gina jaata hai
+  - Year/Month ka hisaab andaaze se hai (1 year = 365.25 din, 1 month = 30.44 din)
+EOF
+        return 0
+    fi
+
+    local wanted="" arg line t sec rc=0 restore_m=0 tty=0
+    local selgiven=0 wall=0 cidx=0 interrupted=0 okc=0 failc=0 chcount=0 tmp
+    local totalflag=0 totalmode=0
+    local _YTFL_RES=""
+    local -a opts=() inputs=() wsecs=() allfiles=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -s|--section)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad section do" >&2; return 1; }
+                wanted="$2"; shift 2 ;;
+            --) shift; opts+=("$@"); break ;;
+            -*) echo "Error: unknown option '$1' (-h se help dekho)" >&2; return 1 ;;
+            *)  opts+=("$1"); shift ;;
+        esac
+    done
+
+    command -v yt-dlp >/dev/null 2>&1 || { echo "Error: yt-dlp install nahi hai" >&2; return 1; }
+    command -v xargs >/dev/null 2>&1 || { echo "Error: xargs install nahi hai" >&2; return 1; }
+
+    if [[ -n "$wanted" ]]; then
+        selgiven=1
+        for t in ${wanted//,/ }; do
+            case "${t,,}" in
+                all) wall=1 ;;
+                total) wall=1; totalflag=1 ;;
+                home|posts|post|community|store)
+                    echo "Note: '$t' me video list nahi hoti, ignore kiya" >&2 ;;
+                *)
+                    sec=$(_ytfl_norm "$t")
+                    [[ -z "$sec" ]] && { echo "Error: invalid section '$t' (-h se list dekho)" >&2; return 1; }
+                    [[ " ${wsecs[*]} " == *" $sec "* ]] || wsecs+=("$sec") ;;
+            esac
+        done
+        if (( ! wall && ${#wsecs[@]} == 0 )); then
+            echo "Error: koi valid section nahi diya" >&2; return 1
+        fi
+    fi
+
+    for arg in "${opts[@]}"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                [[ "$line" =~ ^[0-9]+[[:space:]]+(.+)$ ]] && line="${BASH_REMATCH[1]}"
+                inputs+=("$line")
+            done < "$arg"
+        else
+            inputs+=("$arg")
+        fi
+    done
+
+    if [[ ${#inputs[@]} -eq 0 ]]; then
+        echo "Error: koi channel nahi diya" >&2
+        return 1
+    fi
+
+    tmp=$(mktemp -d) || { echo "Error: temp folder nahi ban paaya" >&2; return 1; }
+    [[ -t 2 ]] && tty=1
+    [[ $- == *m* ]] && restore_m=1
+    set +m
+    trap 'interrupted=1; echo; echo "Stopping..."; kill $(jobs -p) 2>/dev/null; _ytfl_killall' INT
+
+    _ytfl_run
+
+    trap - INT
+    _ytfl_killall
+    rm -rf -- "$tmp"
+    [[ $restore_m -eq 1 ]] && set -m
+
+    if (( failc > 0 )); then echo "Failed: $failc" >&2; fi
+    (( interrupted )) && return 130
+    (( failc == 0 ))
+}
+
+
+
+
+
+
+
+
+
+
+#yt-live-chat
+# ek video ka chat download karke seedha .txt me badalta hai (JSON bachta nahi)
+_ylc_one () {   # url index
+    local v="$1" i="$2" d="$tmp/w.$i" out rc js="" c up="" ti="" id="" dir file cnt reason
+    local st now pid last ended=0 poll="${ylc_poll:-20}"
+    local -a np=()
+    mkdir -p -- "$d"
+    [[ "$v" =~ $vre && "$v" != *list=* ]] && np=(--no-playlist)
+
+    # abhi live hai ya nahi (sirf live video par watcher lagega)
+    st=$(yt-dlp --no-warnings --skip-download --no-playlist --print live_status -- "$v" </dev/null 2>/dev/null | head -1)
+
+    "${tm[@]}" yt-dlp --skip-download --write-subs --sub-langs live_chat --sub-format json \
+        --no-warnings --ignore-errors --ignore-no-formats-error --socket-timeout 30 \
+        "${np[@]}" --print-to-file $'%(uploader,channel|Unknown Channel)s\t%(title)s\t%(id)s' "$d/meta" \
+        -o "$d/chat" -- "$v" </dev/null >"$d/out" 2>&1 &
+    pid=$!
+
+    # Watcher: live band hote hi download roko
+    if [[ "$st" == is_live ]]; then
+        last=$SECONDS
+        while kill -0 "$pid" 2>/dev/null; do
+            sleep 1
+            (( SECONDS - last < poll )) && continue
+            last=$SECONDS
+            now=$(yt-dlp --no-warnings --skip-download --no-playlist --print live_status -- "$v" </dev/null 2>/dev/null | head -1)
+            if [[ "$now" == was_live || "$now" == post_live || "$now" == not_live ]]; then
+                ended=1
+                printf 'Live khatam ho gayi, chat save ho rahi hai: %s\n' "$v"
+                pkill -TERM -P "$pid" 2>/dev/null
+                kill -TERM "$pid" 2>/dev/null
+                break
+            fi
+        done
+    fi
+    wait "$pid" 2>/dev/null
+    rc=$?
+    out=$(<"$d/out")
+
+    for c in "$d/chat.live_chat.json" "$d/chat.live_chat.json.part"; do
+        [[ -s "$c" ]] && { js="$c"; break; }
+    done
+    if [[ -z "$js" ]]; then
+        if (( ! ended && rc != 0 && rc != 124 && rc != 137 && rc != 143 )); then
+            reason=$(grep -m1 'ERROR' <<< "$out" | cut -c1-120)
+            : > "$tmp/fail.$i"
+            printf 'Failed: %s (%s)\n' "$v" "${reason:-exit code $rc}" >&2
+        else
+            : > "$tmp/nochat.$i"
+            printf 'Chat nahi mili: %s (live chat/replay nahi hai)\n' "$v"
+        fi
+        rm -rf -- "$d"; return 0
+    fi
+
+    [[ -s "$d/meta" ]] && IFS=$'\t' read -r up ti id < "$d/meta"
+    [[ -z "$up" || "$up" == NA ]] && up="Unknown Channel"
+    [[ -z "$ti" || "$ti" == NA ]] && ti="live_chat"
+    [[ -z "$id" || "$id" == NA ]] && id="video$i"
+    up="${up//\//⧸}"; ti="${ti//\//⧸}"; ti="${ti:0:150}"
+
+    jq -rR '
+      def runs(r): [ r[]? | if .emoji then
+            (if .emoji.isCustomEmoji then (.emoji.shortcuts[0]? // ":emoji:")
+             else (.emoji.emojiId // .emoji.shortcuts[0]? // "") end)
+          else (.text // "") end ] | join("");
+      fromjson?
+      | (.replayChatItemAction // .) as $r
+      | $r.actions[]?.addChatItemAction.item
+      | (.liveChatTextMessageRenderer // .liveChatPaidMessageRenderer // .liveChatMembershipItemRenderer // empty) as $m
+      | ((($m.timestampUsec // "0") | tonumber) / 1000000 | floor) as $c
+      | (if $c > 0 then ($c | localtime | strflocaltime("%I:%M:%S %p")) else "--:--:-- --" end) as $clock
+      | (runs($m.message.runs)) as $msg
+      | (if $msg == "" then runs($m.headerSubtext.runs) else $msg end) as $body
+      | (if $m.purchaseAmountText then " [" + $m.purchaseAmountText.simpleText + "]" else "" end) as $amt
+      | "\($clock)  |  \($m.authorName.simpleText // "?")\($amt) : \($body | gsub("[\r\n]+"; " "))"
+    ' "$js" > "$d/body" 2>/dev/null
+
+    cnt=$(grep -c . "$d/body")
+    if (( cnt == 0 )); then
+        : > "$tmp/nochat.$i"
+        printf 'Chat nahi mili: %s (chat khaali thi)\n' "$v"
+        rm -rf -- "$d"; return 0
+    fi
+
+    dir="${outdir:-.}"
+    [[ "$choice" == "1" ]] && dir="$dir/$up"
+    mkdir -p -- "$dir" 2>/dev/null
+    file="$dir/$ti [$id].txt"
+    {
+        printf 'Title    : %s\nChannel  : %s\nLink     : https://www.youtube.com/watch?v=%s\nMessages : %s\n' "$ti" "$up" "$id" "$cnt"
+        printf 'Format   : [chat ka asli time]  |  Username : Message\n'
+        printf '%s\n' "------------------------------------------------------------------------------------"
+        cat "$d/body"
+    } > "$file"
+    : > "$tmp/ok.$i"
+    printf 'Done: %s (%s messages) -> %s\n' "$v" "$cnt" "$file"
+    rm -rf -- "$d"
+}
+
+yt-live-chat () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-live-chat [options] <input> [input2 ...]
+
+Live stream ya uske replay ki chat sirf .txt me save karta hai (JSON nahi banta).
+Har line: [chat ka asli time]  |  Username : Message
+Emoji waise hi aate hain (custom emoji :naam: ki tarah). Super Chat me amount bhi.
+
+Example output:
+  07:35:12 PM  |  Ram : hello sab 😀🔥
+  07:35:18 PM  |  Sita [₹100.00] : great stream
+
+Folder:
+  - Ek se zyada video/link do to apne aap har YouTuber ke naam ka folder banta hai
+    (-f lagane ki zarurat nahi, sawaal bhi nahi poochta)
+  - Sirf ek video ho to poochega: 1 = YouTuber ka folder, 2 = bina folder (Enter = 2)
+
+Rukna:
+  - Jaise hi YouTuber live band kare, function apne aap ruk jaata hai aur chat save karta hai
+    (har 20 second me status check hota hai)
+  - -t se upper time limit bhi laga sakte ho, jo pehle ho wahi rok dega
+
+Options:
+  -t, --time T       Itne time baad apne aap ruk jao aur chat save karo.
+                     Jaise 30s, 1m, 45m, 1h, 2h30m, 1h15m10s (seedha number = seconds)
+                     Har video ke liye alag ginta hai
+  -f, --folder       Hamesha YouTuber ka folder (sawaal skip)
+  -H, --here         Folder mat banao (sawaal skip)
+  -d, --dir DIR      Is folder me save karo (default: current folder)
+  -j, --jobs N       Ek saath kitne videos (default: 4, max 8)
+  -h, --help         Ye help
+  (-m purane naam se abhi bhi chalta hai, wahi -t hai)
+
+Input:
+  1. Live / video URL      yt-live-chat https://www.youtube.com/watch?v=XXXX
+  2. Multiple URLs         yt-live-chat url1 url2 url3   (space se alag)
+  3. Playlist / channel    yt-live-chat "https://youtube.com/@name/streams"
+  4. Text file (har line me URL, # skip)   yt-live-chat urls.txt
+
+Examples:
+  yt-live-chat -t 1h https://youtu.be/AAA https://youtu.be/BBB
+  yt-live-chat -t 90m urls.txt
+  yt-live-chat -H -t 30s https://youtu.be/XXXX
+  ylc_poll=10 yt-live-chat https://youtu.be/XXXX     (live band hone ka check har 10 second)
+
+Tips:
+  - Ctrl+C se bhi beech me rok sakte ho, chat save hogi
+  - Chat ka asli time tumhare computer ke local time me aata hai
+  - Zaruri: yt-dlp, jq
+EOF
+        return 0
+    fi
+
+    local outdir="" choice="" par=4 tstr="" secs="" arg line item v got n tmp wp f
+    local okc=0 failc=0 nochat=0 restore_m=0 interrupted=0 i
+    local vre='(youtu\.be/|[?&]v=|/shorts/|/live/|/embed/)'
+    local -a opts=() inputs=() vids=() tm=()
+    local -A seen=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -f|--folder) choice="1"; shift ;;
+            -H|--here)   choice="2"; shift ;;
+            -d|--dir)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad folder do" >&2; return 1; }
+                outdir="$2"; shift 2 ;;
+            -j|--jobs)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad number do" >&2; return 1; }
+                [[ "$2" =~ ^[0-9]+$ && "$2" -ge 1 && "$2" -le 8 ]] || { echo "Error: -j 1 se 8 ke beech ho" >&2; return 1; }
+                par="$2"; shift 2 ;;
+            -t|--time|-m|--max-time)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad time do (jaise 30s, 1m, 1h, 2h30m)" >&2; return 1; }
+                tstr="${2,,}"; tstr="${tstr// /}"
+                if [[ "$tstr" =~ ^[0-9]+$ ]]; then
+                    secs="$tstr"
+                elif [[ "$tstr" =~ ^([0-9]+h)?([0-9]+m)?([0-9]+s)?$ && -n "$tstr" ]]; then
+                    secs=0
+                    [[ "$tstr" =~ ([0-9]+)h ]] && secs=$(( secs + 10#${BASH_REMATCH[1]} * 3600 ))
+                    [[ "$tstr" =~ ([0-9]+)m ]] && secs=$(( secs + 10#${BASH_REMATCH[1]} * 60 ))
+                    [[ "$tstr" =~ ([0-9]+)s ]] && secs=$(( secs + 10#${BASH_REMATCH[1]} ))
+                else
+                    echo "Error: time ka format galat hai: $2 (jaise 30s, 1m, 1h, 2h30m)" >&2; return 1
+                fi
+                (( secs > 0 )) || { echo "Error: time 0 se zyada ho" >&2; return 1; }
+                shift 2 ;;
+            --) shift; opts+=("$@"); break ;;
+            -*) echo "Error: unknown option '$1' (-h se help dekho)" >&2; return 1 ;;
+            *)  opts+=("$1"); shift ;;
+        esac
+    done
+
+    command -v yt-dlp >/dev/null 2>&1 || { echo "Error: yt-dlp install nahi hai" >&2; return 1; }
+    command -v jq >/dev/null 2>&1 || { echo "Error: jq install nahi hai (txt banane ke liye zaruri)" >&2; return 1; }
+    if [[ -n "$secs" ]]; then
+        if command -v timeout >/dev/null 2>&1; then
+            tm=(timeout -k 10 "$secs")
+        else
+            echo "Error: timeout command nahi mila (coreutils chahiye), -t nahi chalega" >&2; return 1
+        fi
+    fi
+
+    for arg in "${opts[@]}"; do
+        if [[ -f "$arg" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                line="${line%$'\r'}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                inputs+=("$line")
+            done < "$arg"
+        else
+            inputs+=("$arg")
+        fi
+    done
+    if [[ ${#inputs[@]} -eq 0 ]]; then
+        echo "Error: koi valid URL nahi mila" >&2
+        return 1
+    fi
+
+    if [[ -n "$outdir" ]]; then
+        mkdir -p -- "$outdir" || { echo "Error: folder ban nahi paaya: $outdir" >&2; return 1; }
+        outdir="${outdir%/}"
+    fi
+
+    # ---- playlist/channel ko video links me todo ----
+    for item in "${inputs[@]}"; do
+        if [[ "$item" =~ $vre && "$item" != *list=* ]]; then
+            [[ -z "${seen[$item]}" ]] && { seen[$item]=1; vids+=("$item"); }
+            continue
+        fi
+        got=0
+        while IFS= read -r v; do
+            [[ -z "$v" || "$v" == NA ]] && continue
+            got=1
+            [[ -z "${seen[$v]}" ]] && { seen[$v]=1; vids+=("$v"); }
+        done < <(yt-dlp --flat-playlist --no-warnings --print '%(url)s' -- "$item" </dev/null 2>/dev/null)
+        if (( got == 0 )) && [[ -z "${seen[$item]}" ]]; then seen[$item]=1; vids+=("$item"); fi
+    done
+    n=${#vids[@]}
+    (( n == 0 )) && { echo "Error: koi video nahi mila" >&2; return 1; }
+    echo "Total videos: $n"
+
+    # ---- Folder: ek se zyada video ho to apne aap YouTuber ke folder me ----
+    if [[ -z "$choice" ]]; then
+        if (( n > 1 )); then
+            choice="1"
+            echo "Folder: har YouTuber ke naam ke folder me save hoga (auto)"
+        elif [[ -t 0 ]]; then
+            while true; do
+                echo
+                echo "Chat kaise save karni hai?"
+                echo "  1) YouTuber ke naam ka folder banao, chat uske andar save karo"
+                echo "  2) Folder mat banao, chat seedha is folder me save karo"
+                read -r -p "Option chuno [1/2] (Enter = 2): " choice
+                choice="${choice:-2}"
+                [[ "$choice" == "1" || "$choice" == "2" ]] && break
+                echo "Galat option, sirf 1 ya 2 likho." >&2
+            done
+        else
+            choice="2"
+        fi
+    fi
+
+    [[ -n "$secs" ]] && echo "Time limit: $tstr (har video itne time baad apne aap ruk jayega, chat save hogi)"
+
+    tmp=$(mktemp -d) || { echo "Error: temp folder nahi ban paaya" >&2; return 1; }
+    [[ $- == *m* ]] && restore_m=1
+    set +m
+    trap 'interrupted=1; echo; echo "Rok rahe hain, jo chat mili wo save ho rahi hai..."; pkill -TERM -f "yt-dlp .*$tmp" 2>/dev/null' INT
+
+    (
+        i=0
+        for v in "${vids[@]}"; do
+            i=$(( i + 1 ))
+            while (( $(jobs -rp | wc -l) >= par )); do wait -n 2>/dev/null || sleep 0.2; done
+            ( _ylc_one "$v" "$i" ) &
+        done
+        wait
+    ) &
+    wp=$!
+    wait "$wp" 2>/dev/null
+    wait "$wp" 2>/dev/null
+
+    for f in "$tmp"/ok.*;     do [[ -e "$f" ]] && okc=$(( okc + 1 )); done
+    for f in "$tmp"/nochat.*; do [[ -e "$f" ]] && nochat=$(( nochat + 1 )); done
+    for f in "$tmp"/fail.*;   do [[ -e "$f" ]] && failc=$(( failc + 1 )); done
+
+    trap - INT
+    rm -rf -- "$tmp"
+    [[ $restore_m -eq 1 ]] && set -m
+
+    echo
+    echo "Done: $okc | Chat nahi mili: $nochat | Failed: $failc | Total: $n"
+    (( interrupted )) && return 130
+    (( failc == 0 ))
+}
+
+
+
+
+
+
+
+
+
+#yt-analysis
+yt-analysis () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-analysis [options] <chat.txt | folder> [more files/folders] -u user1,user2
+
+yt-live-chat se bani chat .txt file me se kisi user (ya kai users) ki
+chat aur us user ko mile replies nikalta hai. Har user ke naam ki alag
+.txt file banti hai.
+
+"Reply" ka matlab: wo message jisme us user ko @mention kiya gaya ho
+(YouTube chat me reply asal me @naam likhkar hi hota hai).
+
+Options:
+  -u, --user NAMES   Username(s), comma se alag: -u "ram,sita,@king"
+                     (space wale naam ke liye bhi comma use karo)
+  -U, --users-file F Usernames ki file (har line me ek, # skip,
+                     "42 @user" jaisi lines bhi chalti hain)
+  -d, --dir DIR      Output folder (default: yt-analysis)
+  -h, --help         Ye help
+
+Input:
+  1. Ek chat file                 yt-analysis chat.txt -u ram
+  2. Kai files / folder           yt-analysis ~/chats -u ram,sita
+     (folder me sirf yt-live-chat wali .txt files li jaati hain)
+  3. Usernames file se            yt-analysis chat.txt -U users.txt
+  4. -u na do to poochega
+
+Output file (ram.txt):
+  User     : ram
+  Chat     : 12 messages
+  Replies  : 5 (@ram wale messages)
+  ===== Video Title | Channel =====
+  https://www.youtube.com/watch?v=XXXX
+  >> 07:35:12 PM  |  Ram : hello sab
+     ↳ 07:35:15 PM  |  Sita : @Ram hi
+  (>> = user ka apna chat,  ↳ = usko mila reply)
+
+Tips:
+  - Naam match chhote-bade akshar aur @ ka farak nahi karta (English naam)
+  - Jis user ka kuch nahi mila uski file nahi banti
+EOF
+        return 0
+    fi
+
+    local outdir="yt-analysis" arg line f t i users="" typed rc
+    local -a opts=() files=() ulist=()
+    local -A fseen=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -u|--user)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad username do" >&2; return 1; }
+                IFS=',' read -r -a ulist <<< "$2"
+                for t in "${ulist[@]}"; do
+                    t="${t#"${t%%[![:space:]]*}"}"; t="${t%"${t##*[![:space:]]}"}"
+                    [[ -n "$t" ]] && users+="$t"$'\n'
+                done
+                shift 2 ;;
+            -U|--users-file)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad file do" >&2; return 1; }
+                [[ -f "$2" ]] || { echo "Error: file nahi mili: $2" >&2; return 1; }
+                while IFS= read -r line || [[ -n "$line" ]]; do
+                    line="${line%$'\r'}"
+                    line="${line#"${line%%[![:space:]]*}"}"
+                    line="${line%"${line##*[![:space:]]}"}"
+                    [[ -z "$line" || "$line" == \#* ]] && continue
+                    [[ "$line" =~ ^[0-9]+[[:space:]]+(@.+)$ ]] && line="${BASH_REMATCH[1]}"
+                    users+="$line"$'\n'
+                done < "$2"
+                shift 2 ;;
+            -d|--dir)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad folder do" >&2; return 1; }
+                outdir="$2"; shift 2 ;;
+            --) shift; opts+=("$@"); break ;;
+            -*) echo "Error: unknown option '$1' (-h se help dekho)" >&2; return 1 ;;
+            *)  opts+=("$1"); shift ;;
+        esac
+    done
+
+    command -v awk >/dev/null 2>&1 || { echo "Error: awk nahi mila" >&2; return 1; }
+
+    for arg in "${opts[@]}"; do
+        if [[ -d "$arg" ]]; then
+            while IFS= read -r -d '' f; do
+                grep -qs 'Format   : \[chat ka asli time\]' "$f" || continue
+                [[ -n "${fseen[$f]}" ]] && continue
+                fseen[$f]=1; files+=("$f")
+            done < <(find "$arg" -type f -name '*.txt' -print0 2>/dev/null | sort -z)
+        elif [[ -f "$arg" ]]; then
+            if ! grep -qs 'Format   : \[chat ka asli time\]' "$arg"; then
+                echo "Skip: $arg (yt-live-chat wali chat file nahi hai)" >&2
+                continue
+            fi
+            [[ -n "${fseen[$arg]}" ]] && continue
+            fseen[$arg]=1; files+=("$arg")
+        else
+            echo "Error: file/folder nahi mila: $arg" >&2; return 1
+        fi
+    done
+
+    if [[ ${#files[@]} -eq 0 ]]; then
+        echo "Error: koi chat file nahi mili (yt-live-chat wali .txt do)" >&2
+        return 1
+    fi
+
+    if [[ -z "$users" ]]; then
+        if [[ -t 0 ]]; then
+            read -r -p "Username(s) (comma se alag): " typed
+            IFS=',' read -r -a ulist <<< "$typed"
+            for t in "${ulist[@]}"; do
+                t="${t#"${t%%[![:space:]]*}"}"; t="${t%"${t##*[![:space:]]}"}"
+                [[ -n "$t" ]] && users+="$t"$'\n'
+            done
+        fi
+        [[ -z "$users" ]] && { echo "Error: koi username nahi diya (-u se do)" >&2; return 1; }
+    fi
+
+    mkdir -p -- "$outdir" || { echo "Error: folder ban nahi paaya: $outdir" >&2; return 1; }
+    for i in "${!files[@]}"; do [[ "${files[i]}" == -* ]] && files[i]="./${files[i]}"; done
+
+    USERS="$users" OUT="${outdir%/}" awk '
+    function norm(s) { sub(/^[ \t]*@/, "", s); sub(/[ \t]+$/, "", s); return tolower(s) }
+    function ment(m, n,   s, p, pos, af) {
+        s = 1
+        while ((p = index(substr(m, s), "@" n)) > 0) {
+            pos = s + p - 1
+            af = substr(m, pos + 1 + length(n), 1)
+            if (af == "" || af !~ /[A-Za-z0-9_]/) return 1
+            s = pos + 1
+        }
+        return 0
+    }
+    function emit(k, isrep, line) {
+        if (last[k] != src) {
+            buf[k] = buf[k] "===== " title " | " chan " =====\n" link "\n"
+            last[k] = src
+        }
+        if (isrep) { buf[k] = buf[k] "   ↳ " line "\n"; rep[k]++ }
+        else       { buf[k] = buf[k] ">> " line "\n";   own[k]++ }
+    }
+    BEGIN {
+        n = split(ENVIRON["USERS"], ul, "\n")
+        for (i = 1; i <= n; i++) {
+            if (ul[i] == "") continue
+            k = norm(ul[i]); if (k == "") continue
+            if (!(k in disp)) { d = ul[i]; sub(/^[ \t]*@/, "", d); disp[k] = d; keys[++nk] = k }
+        }
+    }
+    { sub(/\r$/, "") }
+    FNR == 1 { src++; title = ""; chan = ""; link = "" }
+    /^Title    : /   { title = substr($0, 12); next }
+    /^Channel  : /   { chan  = substr($0, 12); next }
+    /^Link     : /   { link  = substr($0, 12); next }
+    {
+        if (!match($0, /^([0-9][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M|--:--:-- --)  \|  /)) next
+        rest = substr($0, RLENGTH + 1)
+        idx = index(rest, " : "); if (!idx) next
+        author = substr(rest, 1, idx - 1); msg = substr(rest, idx + 3)
+        a2 = author; sub(/ \[[^]]*\]$/, "", a2)
+        ak = norm(author); ak2 = norm(a2)
+        o = ""
+        if (ak in disp) o = ak; else if (ak2 in disp) o = ak2
+        if (o != "") emit(o, 0, $0)
+        if (index(msg, "@")) {
+            ml = tolower(msg)
+            for (j = 1; j <= nk; j++) {
+                k = keys[j]
+                if (k != o && ment(ml, k)) emit(k, 1, $0)
+            }
+        }
+    }
+    END {
+        found = 0
+        for (j = 1; j <= nk; j++) {
+            k = keys[j]
+            if (own[k] + rep[k] == 0) { printf "Nahi mila: %s\n", disp[k]; continue }
+            found++
+            safe = disp[k]
+            gsub(/[[:cntrl:]]/, "", safe); gsub(/\//, "⧸", safe)
+            if (length(safe) > 60) safe = substr(safe, 1, 60) "_" j
+            if (safe == "" || safe ~ /^\./) safe = "_" safe j
+            f = ENVIRON["OUT"] "/" safe ".txt"
+            printf "User     : %s\nChat     : %d messages\nReplies  : %d (@%s wale messages)\nFormat   : >> user ka chat,  ↳ usko mila reply\n------------------------------------------------------------------------------------\n", disp[k], own[k], rep[k], disp[k] > f
+            printf "%s", buf[k] > f
+            close(f)
+            printf "Done: %s (chat %d, reply %d) -> %s\n", disp[k], own[k], rep[k], f
+        }
+        exit (found > 0 ? 0 : 1)
+    }' "${files[@]}"
+    rc=$?
+    (( rc != 0 )) && echo "Kisi bhi user ka chat ya reply nahi mila." >&2
+    return $rc
+}
+
+
+
+
+
+
+
+
+
+
+#

@@ -1,0 +1,28 @@
+┌───────────────────────────────────┬────────────────────────────────────────┐
+│ Component                        │ Name                                  │
+├───────────────────────────────────┼────────────────────────────────────────┤
+│ Desktop Environment              │ Cinnamon                              │
+│ File Manager                     │ Nemo                                  │
+│ Terminal                         │ MATE Terminal / Tilix                 │
+│ Text Editor                      │ Xed                                   │
+│ Image Viewer                     │ Xviewer                               │
+│ Video Player                     │ Celluloid (MPV)                       │
+│ Music Player                     │ Rhythmbox                             │
+│ Browser                          │ Firefox                               │
+│ PDF Viewer                       │ Xreader                               │
+│ Archive Manager                  │ Xarchiver / Engrampa                  │
+│ Screenshot Tool                  │ Xfce Screenshooter / GNOME Screenshot │
+│ System Monitor                   │ GNOME System Monitor                  │
+│ Task Manager                     │ btop (terminal)                       │
+│ Package Manager                  │ APT (terminal)                        │
+│ Software Manager                 │ Mint Software Manager                 │
+│ Update Manager                   │ Update Manager                        │
+│ Settings                         │ Cinnamon Settings                     │
+│ Display Manager (Login)          │ MDM / LightDM                         │
+│ Firewall                         │ UFW + Gufw (GUI)                      │
+│ Bluetooth                        │ Blueberry                             │
+│ Network Manager                  │ NetworkManager + nm-applet            │
+│ Printer Manager                  │ CUPS / System Config Printer          │
+│ Font Manager                     │ Font Manager                          │
+│ Disk Utility                     │ GParted / Disks (GNOME Disks)         │
+└───────────────────────────────────┴────────────────────────────────────────┘

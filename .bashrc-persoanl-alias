@@ -1,0 +1,269 @@
+#+--------------------------------------+
+#|                                      |
+#|                BASIC                 |
+#|                                      |
+#+--------------------------------------+
+
+alias btop="btop --utf-force"
+
+alias c="clear"
+alias cdb="cd ~/.local/share/bmm"		#bmm location
+
+alias ek="nano ~/.config/kitty/kitty.conf"
+
+alias format="cat msg.txt | sed '2,$ s/^/>/g'"	#obsidian nested callout formatter
+alias F=elio					#TUI based File manager
+
+alias gc="git fetch origin && git diff HEAD origin/main"	#current github repo mai koi changes huey hai kya ye pta krney k liyey	#ydi find hua to gitpull
+
+alias hash="sed 's/^/#/g'"
+alias h='history'
+alias hc='history -c'
+
+alias i="sudo apt install"
+
+alias n="nano"
+
+alias p="setsid pluma"			#setsid (1)           - run a program in a new session
+
+alias q="judo"
+
+alias tree='tree -CAhF --dirsfirst'		#Folder and files with Size (in tree format)
+alias treed='tree -CAFd'			#Directory only (in tree format)
+
+alias u='sudo apt update'
+alias U='sudo apt update && sudo apt full-upgrade -y && sudo apt-file update'
+
+alias x="exit"
+alias xxy="poweroff"
+alias xxxy="reboot"
+alias xml="xmllint --format"		#see xml data to proper format
+
+
+#+--------------------------------------+
+#|                                      |
+#|              Networking              |
+#|                                      |
+#+--------------------------------------+
+
+alias openports='netstat -nape --inet'		#Show Open Ports
+
+alias tree='tree -CAhF --dirsfirst'
+alias treed='tree -CAFd'
+
+
+
+
+#+--------------------------------------+
+#|                                      |
+#|        Default OS Application        |
+#|                                      |
+#+--------------------------------------+
+
+alias defaultm="cat ~/.bashrc-pc/.os_default_apps/linux_mint"
+alias defaultk="cat ~/.bashrc-pc/.os_default_apps/kali_linux"
+alias defaulta="cat ~/.bashrc-pc/.os_default_apps/arch_linux"
+alias defaultmac="cat ~/.bashrc-pc/.os_default_apps/macOS"
+alias defaulto="cat ~/.bashrc-pc/.os_default_apps/omarchy"
+alias defaultp="cat ~/.bashrc-pc/.os_default_apps/parrot"
+alias defaultw="cat ~/.bashrc-pc/.os_default_apps/windows11"
+
+
+
+#+--------------------------------------+
+#|                                      |
+#|          System Service              |
+#|                                      |
+#+--------------------------------------+
+
+#╭──────────────────╮
+#│                  │
+#│    unit type     │
+#│                  │
+#╰──────────────────╯
+
+alias systemtype-all='systemctl list-units --all'
+alias systemtype-service='systemctl list-units --type=service'
+alias systemtype-socket='systemctl list-units --type=socket'
+alias systemtype-target='systemctl list-units --type=target'
+alias systemtype-mount='systemctl list-units --type=mount'
+alias systemtype-automount='systemctl list-units --type=automount'
+alias systemtype-device='systemctl list-units --type=device'
+alias systemtype-timer='systemctl list-units --type=timer'
+alias systemtype-path='systemctl list-units --type=path'
+alias systemtype-slice='systemctl list-units --type=slice'
+alias systemtype-scope='systemctl list-units --type=scope'
+alias systemtype-swap='systemctl list-units --type=swap'
+
+
+
+#+--------------------------------------+
+#|                                      |
+#|                kitty                 |
+#|                                      |
+#+--------------------------------------+
+
+alias kcat="kitty +kitten icat"		#image view in kitty terminal
+alias kfont='kitty +list-fonts'		#kitty terminal font list (TUI view)
+alias ktheme='kitten themes'		#kitty terminal themes
+alias kssh="kitty +kitten ssh"		#alias to be able to use kitty features when connection to remote server (e.g use tmux on remote server)
+
+
+#+--------------------------------------+
+#|                                      |
+#|              Logs view               |
+#|                                      |
+#+--------------------------------------+
+
+#`/var/log` ki text log files (rotated wali chhodkar) sab par ek saath tail -f chalata hai, yaani saare logs ki live updates ek terminal me dikhte hain.
+alias logs="sudo find /var/log -type f -exec file {} \; | grep 'text' | cut -d' ' -f1 | sed -e's/:$//g' | grep -v '[@-9]$' | xargs tail -f"
+
+
+
+#+--------------------------------------+
+#|                                      |
+#|          ls command aliases          |
+#|                                      |
+#+--------------------------------------+
+
+alias lsa='ls -Alh'				#show hidden files
+alias lsh="ls -a | grep '^\.' --color=never"	#hidden file only
+alias ls='ls -Fh --color=always'		#show color and file (not hidden) type extension
+alias lsa='ls -aFh --color=always'		#show color and file (including hidden) type extension
+alias lsx='ls -lXBh'				#sort by extension
+alias lss='ls -lSrh'				#sort by size
+alias lsct='ls -ltcrh'				#sort by change time
+alias lsat='ls -lturh'				#sort by access time
+alias lsr='ls -lRh'				#recursie ls
+alias lsd='ls -ltrh'				#sort by date
+alias lsm='ls -alh | more'			#pipe through 'more'
+alias lsw='ls -xAh'				#wide listing format
+alias lsabc='ls -lap'				#alphabetical sort
+alias lsf="ls -l | grep -v '^d'"		#files only
+alias lsdir="ls -l | grep '^d' --color=never"	#directory only		#(or better) compgen -d | sort
+
+
+
+#+--------------------------------------+
+#|                                      |
+#|                 live                 |
+#|                                      |
+#+--------------------------------------+
+
+
+
+
+#+--------------------------------------+
+#|                                      |
+#|              Archieves               |
+#|                                      |
+#+--------------------------------------+
+
+alias mktar='tar -cvf'			#make TAR file
+alias mkbz2='tar -cvjf'			#make Bzip2 file
+alias mkgz='tar -cvzf'			#make Gzip file
+alias mkxz='tar -cvJf'			#make XZ file
+
+alias untar='tar -xvf'			#unzip TAR file
+alias unbz2='tar -xvjf'			#unzip Bzip2 file
+alias ungz='tar -xvzf'			#unzip Gzip file
+alias unxz='tar -xvJf'			#unzip XZ file
+
+
+#+--------------------------------------+
+#|                                      |
+#|          prompt PS1 values           |
+#|                                      |
+#+--------------------------------------+
+
+## (ubuntu default) => username@hostname:~$
+#PS1='\[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+
+## (ubuntu default + error_code_number) => username@hostname:~$
+#PS1='\[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\] [$?]\$ '
+ 
+## [11:16 PM] ~/Desktop $
+#PS1='\[\e[34m\][\@]\[\e[0m\] \[\e[32m\]\w\[\e[0m\] \[\e[97m\]\$\[\e[0m\] '
+
+## [11:15 PM] username@hostname:~$ 
+PS1='\[\e[34m\][\@]\[\e[0m\] \[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+
+
+#+--------------------------------------+
+#|                                      |
+#|                 Gaph                 |
+#|                                      |
+#+--------------------------------------+
+
+#command k prompt k baad 1 line ka gaph k liyey
+PS0="${PS0}\n"
+
+#command k ouput k last mai 2 line ka gaph k liyey
+PROMPT_COMMAND='echo;'
+
+
+#+--------------------------------------+
+#|                                      |
+#|               machine                |
+#|                                      |
+#+--------------------------------------+
+
+alias thm="sudo openvpn ~/Downloads/vpn_file/ap-south-1-raisubham1024-regular.ovpn"
+alias htb="sudo openvpn ~/Downloads/vpn_file/academy-regular.ovpn"
+
+
+
+#+--------------------------------------+
+#|                                      |
+#|               Archive                |
+#|                                      |
+#+--------------------------------------+
+
+alias mktar='tar -cvf'
+alias mkbz2='tar -cvjf'
+alias mkgz='tar -cvzf'
+alias mkxz='tar -cvJf'
+alias untar='tar -xvf'
+alias unbz2='tar -xvjf'
+alias ungz='tar -xvzf'
+alias unxz='tar -xvJf'
+
+
+#+--------------------------------------+
+#|                                      |
+#|              locations               |
+#|                                      |
+#+--------------------------------------+
+
+alias t='cd ~/Desktop/testing'
+alias tt='cd ~/Desktop/testing/test'
+
+
+
+#+--------------------------------------+
+#|                                      |
+#|                 Disk                 |
+#|                                      |
+#+--------------------------------------+
+
+alias mountinfo='df -hT'				#Information about mounted disks
+alias diskspace='du -S | sort -n -r | more'		#Shows folders sorted by size, biggest first,
+alias folders='du -h --max-depth=1'			#Shows the size of each folder (and the total) one level deep, in human-readable format (KB/MB/GB).
+
+
+
+#+--------------------------------------+
+#|                                      |
+#|                Docker                |
+#|                                      |
+#+--------------------------------------+
+
+#alias to cleanup unused docker containers, images, networks, and volumes
+alias docker-clean=' \
+docker container prune -f ; \
+docker image prune -f ; \
+docker network prune -f ; \
+docker volume prune -f '
+
+
+

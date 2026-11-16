@@ -1,0 +1,24 @@
+┌──────────────────────────┬────────────────────────────────────────────────────────────────┐
+│ Component                │ Name                                                           │
+├──────────────────────────┼────────────────────────────────────────────────────────────────┤
+│ Desktop Environment      │ MATE (default)                                                 │
+│ File Manager             │ Caja                                                           │
+│ Terminal                 │ MATE Terminal                                                  │
+│ Text Editor              │ Pluma                                                          │
+│ Image Viewer             │ Eye of MATE (eom)                                              │
+│ Video Player             │ VLC (?)                                                        │
+│ Browser                  │ Firefox ESR                                                    │
+│ PDF Viewer               │ Atril                                                          │
+│ Archive Manager          │ Engrampa                                                       │
+│ Screenshot Tool          │ MATE Screenshot                                                │
+│ System Monitor           │ MATE System Monitor                                            │
+│ Package Manager          │ APT                                                            │
+│ Software Manager         │ - (APT / terminal)                                             │
+│ Display Manager (Login)  │ LightDM                                                        │
+│ Firewall                 │ iptables / nftables (UFW default nahi)                         │
+│ Network Manager          │ NetworkManager                                                 │
+│ Bluetooth                │ Blueman                                                        │
+│ Disk Utility             │ GParted (?)                                                    │
+│ Hacking Tools            │ Metasploit, Nmap, Burp Suite, Wireshark, Aircrack-ng, Hydra,   │
+│                          │ John the Ripper, etc.                                          │
+└──────────────────────────┴────────────────────────────────────────────────────────────────┘

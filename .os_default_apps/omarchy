@@ -1,0 +1,26 @@
+┌──────────────────────────┬────────────────────────────────────────────────────────────────┐
+│ Component                │ Name                                                           │
+├──────────────────────────┼────────────────────────────────────────────────────────────────┤
+│ Desktop Environment      │ Hyprland (tiling Wayland compositor)                           │
+│ Top Bar                  │ Waybar                                                         │
+│ App Launcher             │ Walker                                                         │
+│ Terminal                 │ Alacritty (ya Ghostty, version par depend ?)                   │
+│ File Manager             │ Nautilus                                                       │
+│ Text Editor              │ Neovim (LazyVim)                                               │
+│ Image Viewer             │ imv                                                            │
+│ Video Player             │ mpv                                                            │
+│ Browser                  │ Chromium                                                       │
+│ PDF Viewer               │ Evince                                                         │
+│ Screenshot Tool          │ hyprshot + satty                                               │
+│ System Monitor           │ btop                                                           │
+│ Package Manager          │ pacman (+ yay for AUR)                                         │
+│ Software Manager         │ Omarchy menu (terminal-based)                                  │
+│ Display Manager (Login)  │ SDDM (auto-login)                                              │
+│ Firewall                 │ UFW                                                            │
+│ Network Manager          │ iwd (impala TUI ?)                                             │
+│ Bluetooth                │ bluetui                                                        │
+│ Notifications            │ mako                                                           │
+│ Filesystem               │ Btrfs (snapshots ke saath)                                     │
+│ Password Manager         │ 1Password (?)                                                  │
+│ Hacking Tools            │ - (default nahi)                                               │
+└──────────────────────────┴────────────────────────────────────────────────────────────────┘

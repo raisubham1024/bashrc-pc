@@ -1,0 +1,22 @@
+┌──────────────────────────┬────────────────────────────────────────────────────────────────┐
+│ Component                │ Name                                                           │
+├──────────────────────────┼────────────────────────────────────────────────────────────────┤
+│ Desktop Environment      │ - (khud install: GNOME, KDE, XFCE, etc.)                       │
+│ File Manager             │ -                                                              │
+│ Terminal                 │ - (sirf TTY console)                                           │
+│ Text Editor              │ - (nano ya vim khud install karo)                              │
+│ Image / Video / PDF      │ -                                                              │
+│ Browser                  │ -                                                              │
+│ Archive Manager          │ - (tar, gzip jaise CLI tools base mein)                        │
+│ Package Manager          │ pacman                                                         │
+│ Software Manager         │ - (AUR ke liye yay/paru khud install karo)                     │
+│ Init System              │ systemd                                                        │
+│ Shell                    │ Bash                                                           │
+│ Display Manager (Login)  │ - (GDM, SDDM, LightDM khud)                                    │
+│ Firewall                 │ - (ufw / nftables khud)                                        │
+│ Network Manager          │ - (NetworkManager, iwd ya systemd-networkd khud)               │
+│ Bluetooth                │ - (bluez khud)                                                 │
+│ Bootloader               │ - (GRUB ya systemd-boot khud)                                  │
+│ Installer                │ archinstall (optional) ya manual                               │
+│ Hacking Tools            │ - (BlackArch repo alag se add karni padti hai)                 │
+└──────────────────────────┴────────────────────────────────────────────────────────────────┘

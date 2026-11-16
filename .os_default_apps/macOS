@@ -1,0 +1,30 @@
+┌──────────────────────────┬────────────────────────────────────────────────────────────────┐
+│ Component                │ Name                                                           │
+├──────────────────────────┼────────────────────────────────────────────────────────────────┤
+│ Desktop Environment      │ Aqua (Finder, Dock, Menu Bar)                                  │
+│ File Manager             │ Finder                                                         │
+│ Terminal                 │ Terminal                                                       │
+│ Shell                    │ zsh (Catalina 10.15 se default)                                │
+│ Text Editor              │ TextEdit                                                       │
+│ Image Viewer             │ Preview                                                        │
+│ Video Player             │ QuickTime Player                                               │
+│ Music Player             │ Music                                                          │
+│ Browser                  │ Safari                                                         │
+│ PDF Viewer               │ Preview                                                        │
+│ Archive Manager          │ Archive Utility                                                │
+│ Screenshot Tool          │ Screenshot (Cmd+Shift+5)                                       │
+│ System Monitor           │ Activity Monitor                                               │
+│ Package Manager          │ - (default nahi, Homebrew khud install karna padta hai)        │
+│ Software Manager         │ App Store                                                      │
+│ Update Manager           │ System Settings > Software Update                              │
+│ Settings                 │ System Settings                                                │
+│ Display Manager (Login)  │ Login Window                                                   │
+│ Firewall                 │ Application Firewall (built-in, pf bhi hai)                    │
+│ Network Manager          │ System Settings > Network                                      │
+│ Bluetooth                │ System Settings > Bluetooth                                    │
+│ Disk Utility             │ Disk Utility                                                   │
+│ Password Manager         │ Passwords app (macOS 15+) / iCloud Keychain                    │
+│ Backup                   │ Time Machine                                                   │
+│ Search                   │ Spotlight                                                      │
+│ Hacking Tools            │ - (default nahi)                                               │
+└──────────────────────────┴────────────────────────────────────────────────────────────────┘

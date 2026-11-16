@@ -1,0 +1,28 @@
+┌───────────────────────────────────┬─────────────────────────────────────────────────────────────────────┐
+│ Component                        │ Name                                                                │
+├───────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+│ Desktop Environment              │ XFCE (default)                                                      │
+│ File Manager                     │ Thunar                                                              │
+│ Terminal                         │ xfce4-terminal                                                      │
+│ Text Editor                      │ Mousepad                                                            │
+│ Image Viewer                     │ Ristretto                                                           │
+│ Video Player                     │ Parole                                                              │
+│ Music Player                     │ - (default nahi)                                                    │
+│ Browser                          │ Firefox ESR                                                         │
+│ PDF Viewer                       │ Evince                                                              │
+│ Archive Manager                  │ Xarchiver                                                           │
+│ Screenshot Tool                  │ xfce4-screenshooter                                                 │
+│ System Monitor                   │ Task Manager (XFCE)                                                 │
+│ Package Manager                  │ APT (terminal)                                                      │
+│ Software Manager                 │ - (direct APT use hota hai)                                         │
+│ Update Manager                   │ APT / terminal                                                      │
+│ Settings                         │ XFCE Settings Manager                                               │
+│ Display Manager (Login)          │ LightDM                                                             │
+│ Firewall                         │ UFW (terminal)                                                      │
+│ Network Manager                  │ NetworkManager                                                      │
+│ Bluetooth                        │ Blueman                                                             │
+│ Disk Utility                     │ GParted                                                             │
+│ Password Manager                 │ -                                                                   │
+│ Hacking Tools                    │ Metasploit, Nmap, Burpsuite, Wireshark, Aircrack-ng, Hydra,        │
+│                                  │ John the Ripper, etc.                                               │
+└───────────────────────────────────┴─────────────────────────────────────────────────────────────────────┘

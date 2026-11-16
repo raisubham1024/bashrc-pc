@@ -1,0 +1,29 @@
+┌──────────────────────────┬────────────────────────────────────────────────────────────────┐
+│ Component                │ Name                                                           │
+├──────────────────────────┼────────────────────────────────────────────────────────────────┤
+│ Desktop Environment      │ Windows Shell (Explorer, Taskbar, Start Menu)                  │
+│ File Manager             │ File Explorer                                                  │
+│ Terminal                 │ Windows Terminal (PowerShell / CMD)                            │
+│ Shell                    │ PowerShell                                                     │
+│ Text Editor              │ Notepad                                                        │
+│ Image Viewer             │ Photos                                                         │
+│ Video Player             │ Media Player                                                   │
+│ Music Player             │ Media Player                                                   │
+│ Browser                  │ Microsoft Edge                                                 │
+│ PDF Viewer               │ Microsoft Edge                                                 │
+│ Archive Manager          │ File Explorer (ZIP built-in, 7z/RAR naye versions mein)        │
+│ Screenshot Tool          │ Snipping Tool (Win+Shift+S)                                    │
+│ System Monitor           │ Task Manager (Ctrl+Shift+Esc)                                  │
+│ Package Manager          │ winget                                                         │
+│ Software Manager         │ Microsoft Store                                                │
+│ Update Manager           │ Windows Update                                                 │
+│ Settings                 │ Settings app + Control Panel (purana)                          │
+│ Display Manager (Login)  │ Windows Logon (LogonUI)                                        │
+│ Firewall                 │ Windows Defender Firewall                                      │
+│ Antivirus                │ Microsoft Defender                                             │
+│ Network Manager          │ Settings > Network & Internet                                  │
+│ Bluetooth                │ Settings > Bluetooth & devices                                 │
+│ Disk Utility             │ Disk Management                                                │
+│ Password Manager         │ Credential Manager / Edge passwords                            │
+│ Hacking Tools            │ - (default nahi)                                               │
+└──────────────────────────┴────────────────────────────────────────────────────────────────┘
