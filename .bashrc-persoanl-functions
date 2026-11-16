@@ -108,8 +108,8 @@ cd "$HOME/Templates/backup script/" || return
 
 	bash bookmark_backup.sh
 	bash obsidian_notes_backup.sh
-	bash obsidian_conf_backup.sh
 	bash bashrc-pc_backup.sh
+	bash obsidian_conf_backup.sh
 	bash kitty_conf_backup.sh
 	bash documentation-AI-generated_backup.sh
 )
