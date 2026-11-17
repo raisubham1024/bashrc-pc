@@ -267,3 +267,10 @@ docker volume prune -f '
 
 
 
+#+----------------------------+
+#|                            |
+#|           Termux           |
+#|                            |
+#+----------------------------+
+
+alias pullmobile="bash ~/termux-script/mobile_pull_request.sh 2>/dev/null"
