@@ -112,10 +112,7 @@ cd "$HOME/Templates/backup script/" || return
 	bash obsidian_conf_backup.sh
 	bash kitty_conf_backup.sh
 	bash documentation-AI-generated_backup.sh
-
-
-cd "$HOME//Templates/termux script/" || return
-	bash mobile_pull_request.sh
+	bash termux-script_folder_backup.sh
 
 )
 
