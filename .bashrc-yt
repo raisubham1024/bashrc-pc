@@ -2,6 +2,19 @@
 # !!! WARNING: Use VPN otherwise they ask you for Browser-Cookie !!!
 # ==================================================================
 
+#yt-list
+yt-list() {
+  yt-dlp --list-extractors | nl
+}
+
+#+--------------------------------------+
+#|                                      |
+#|            Youtube search            |
+#|                                      |
+#+--------------------------------------+
+
+#yt-search
+
 
 #+--------------------------------------+
 #|                                      |
@@ -111,9 +124,15 @@
 #|                            |
 #+----------------------------+
 #yt-live-chat				#Youtube-live ki chat extract
-#yt-analysis				#Unn .txt chat se particulars ki chat extract
+#yt-analysis				#"yt-live-chat" se niklee -> Uss .txt chat se particulars ki chat extract
+#yt-username				#"yt-live-chat" se niklee -> Uss .txt chat se usernames ki list extract
 
 ###################################################################################################
+
+
+#yt-search
+
+
 
 
 #yt-format
@@ -4926,6 +4945,139 @@ EOF
     rc=$?
     (( rc != 0 )) && echo "Kisi bhi user ka chat ya reply nahi mila." >&2
     return $rc
+}
+
+
+
+
+
+
+
+
+
+
+#yt-username
+yt-username () 
+{ 
+    if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+        cat <<'EOF'
+Usage: yt-username [options] <chat.txt | folder> [more files/folders]
+
+yt-live-chat se bani chat .txt file(s) me se sirf usernames ki list nikalta hai.
+Duplicate nahi aate, aur list A-Z sorted aati hai.
+
+Options:
+  -c, --count     Har user ke kitne messages hain wo bhi dikhao
+                  (zyada messages wale pehle, barabar par A-Z)
+  -a, --at        Har username ke aage @ lagao
+  -o, --out F     Result file me bhi save karo (screen par bhi aayega)
+  -h, --help      Ye help
+
+Input:
+  1. Ek chat file          yt-username chat.txt
+  2. Kai files             yt-username a.txt b.txt
+  3. Folder                yt-username ~/chats   (sirf yt-live-chat wali .txt files)
+
+Output:
+  aman
+  Bhavesh
+  charlie
+
+  (-c ke saath)
+  42  charlie
+  17  aman
+
+Tips:
+  - Super Chat ka [₹100.00] wala hissa naam se hata diya jaata hai
+  - Naam chhote-bade akshar ke farak se alag-alag nahi gine jaate (Raj aur raj ek hi)
+  - File me save karne ke liye: yt-username chat.txt -o users.txt
+  - users.txt ko yt-pic ya yt-analysis -U me seedha de sakte ho
+EOF
+        return 0
+    fi
+
+    local count=0 at=0 outf="" arg f
+    local -a opts=() files=()
+    local -A fseen=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -c|--count) count=1; shift ;;
+            -a|--at)    at=1; shift ;;
+            -o|--out)
+                [[ $# -lt 2 ]] && { echo "Error: $1 ke baad file ka naam do" >&2; return 1; }
+                outf="$2"; shift 2 ;;
+            --) shift; opts+=("$@"); break ;;
+            -*) echo "Error: unknown option '$1' (-h se help dekho)" >&2; return 1 ;;
+            *)  opts+=("$1"); shift ;;
+        esac
+    done
+
+    for arg in "${opts[@]}"; do
+        if [[ -d "$arg" ]]; then
+            while IFS= read -r -d '' f; do
+                grep -qs 'Format   : \[chat ka asli time\]' "$f" || continue
+                [[ -n "${fseen[$f]}" ]] && continue
+                fseen[$f]=1; files+=("$f")
+            done < <(find "$arg" -type f -name '*.txt' -print0 2>/dev/null | sort -z)
+        elif [[ -f "$arg" ]]; then
+            if ! grep -qs 'Format   : \[chat ka asli time\]' "$arg"; then
+                echo "Skip: $arg (yt-live-chat wali chat file nahi hai)" >&2
+                continue
+            fi
+            [[ -n "${fseen[$arg]}" ]] && continue
+            fseen[$arg]=1; files+=("$arg")
+        else
+            echo "Error: file/folder nahi mila: $arg" >&2; return 1
+        fi
+    done
+
+    if [[ ${#files[@]} -eq 0 ]]; then
+        echo "Error: koi chat file nahi mili (yt-live-chat wali .txt do)" >&2
+        return 1
+    fi
+    for f in "${!files[@]}"; do [[ "${files[f]}" == -* ]] && files[f]="./${files[f]}"; done
+
+    local res
+    res=$(
+        AT="$at" CNT="$count" awk '
+        { sub(/\r$/, "") }
+        {
+            if (!match($0, /^([0-9][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M|--:--:-- --)  \|  /)) next
+            rest = substr($0, RLENGTH + 1)
+            idx = index(rest, " : "); if (!idx) next
+            a = substr(rest, 1, idx - 1)
+            sub(/ \[[^]]*\]$/, "", a)
+            gsub(/^[ \t]+|[ \t]+$/, "", a)
+            if (a == "" || a == "?") next
+            k = tolower(a)
+            if (!(k in c)) first[k] = a
+            c[k]++
+        }
+        END {
+            for (k in c) printf "%d\t%s\t%s\n", c[k], k, first[k]
+        }' "${files[@]}" \
+        | if (( count )); then
+            LC_ALL=C sort -t $'\t' -k1,1nr -k2,2
+          else
+            LC_ALL=C sort -t $'\t' -k2,2
+          fi \
+        | awk -F'\t' -v at="$at" -v cnt="$count" '{
+            n = (at == 1 ? "@" : "") $3
+            if (cnt == 1) printf "%d  %s\n", $1, n; else print n
+        }'
+    )
+
+    if [[ -z "$res" ]]; then
+        echo "Koi username nahi mila (file me chat lines hain?)" >&2
+        return 1
+    fi
+
+    printf '%s\n' "$res"
+    if [[ -n "$outf" ]]; then
+        printf '%s\n' "$res" > "$outf" || { echo "Error: file nahi likh paaya: $outf" >&2; return 1; }
+        echo "Saved: $outf ($(grep -c . <<< "$res") users)" >&2
+    fi
 }
 
 
