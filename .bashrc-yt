@@ -1,8 +1,4 @@
 
-#yt-list
-yt-list() {
-  yt-dlp --list-extractors | nl
-}
 
 #+--------------------------------------+
 #|                                      |
@@ -10,8 +6,9 @@ yt-list() {
 #|                                      |
 #+--------------------------------------+
 
-#yt-search
+#yt-search			#Youtube search with Regex-based searching 
 
+#yt-list			#List of supported websites
 
 #+--------------------------------------+
 #|                                      |
@@ -130,6 +127,10 @@ yt-list() {
 #yt-search
 
 
+#yt-list
+yt-list() {
+  yt-dlp --list-extractors | nl
+}
 
 
 #yt-format
