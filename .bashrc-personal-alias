@@ -103,6 +103,9 @@ alias systemtype-swap='systemctl list-units --type=swap'
 #|                                      |
 #+--------------------------------------+
 
+#kitty update
+alias ku="curl -L https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin"
+
 alias kcat="kitty +kitten icat"		#image view in kitty terminal
 alias kfont='kitty +list-fonts'		#kitty terminal font list (TUI view)
 alias ktheme='kitten themes'		#kitty terminal themes
