@@ -125,6 +125,821 @@
 
 
 #yt-search
+yt-search () 
+{ 
+    local a
+    for a in "$@"; do
+        [[ "$a" == "--" ]] && break
+        if [[ "$a" == "-h" || "$a" == "--help" ]]; then set --; break; fi
+    done
+    if [[ $# -eq 0 ]]; then
+        cat <<'EOF'
+Usage: yt-search [options] "search" ["search2" ...]
+
+YouTube search (yt-dlp se) jisme title par regex filter chalta hai.
+Sab kuch case-insensitive hai. Search HAMESHA single ya double quote me likho.
+Result milte hi turant dikhte hain.
+
+Do tarah ki search:
+  Normal      : YouTube me search, matched kam pade to aur gehra scan (default 500,
+                ya count x 20, -M se badlo)
+  Channel (-C): us YouTuber ke SAARE videos (Videos + Shorts + Live) scan hote hain,
+                koi scan limit nahi. Jaise hi -c jitne mil jaayein, ruk jaata hai.
+                Ek se zyada channel bhi de sakte ho (neeche dekho).
+
+Search likhne ke tareeke:
+  "linux"                    normal search, koi title filter nahi
+  "^how to"                  title "how to" se shuru
+  "^how to *boot*"           "how to" se shuru, beech me kahin "boot"
+  "^how to * 2026$"          "how to" se shuru aur "2026" par khatam
+  "(rust|go) tutorial"       regex, kuch bhi chalta hai
+  Regex ho (^ $ * [ ( | \ {) to YouTube ka search text apne aap title ke
+  shabdon se banta hai. Alag text chahiye to -q do.
+  Bina quotes ke * ko shell file naam bana dega, isliye quotes zaruri hain.
+  Regex me akela * (jaise "boot*" ya " * ") wildcard maana jaata hai (.*).
+  Asli regex quantifier (.* , [a-z]* , (ab)* ) waise hi chalte hain.
+
+Options:
+  -c, --count N         Kitne result dikhane hain (default 10), jaise -c 15
+                        (kai channel ho to HAR channel ke liye N)
+  -C, --channel CH      Sirf is channel me, uske saare videos scan (-u bhi chalta hai)
+                        CH = @handle, channel URL, channel ka naam, kai channel
+                        comma se, ya channel ki file (har line me ek)
+  -t, --titles          Sirf title dikhao (ek line me ek, number/link/duration ke bina)
+  -l, --links           Sirf links (ek line me ek), doosre tools me pipe karne ke liye
+  -r, --regex           Search ko regex maano aur title par filter lagao ("linux" par bhi)
+  -P, --plain           Search ko normal text maano, regex nahi
+  -R, --raw             Regex bilkul asli ho, * ko wildcard mat banao
+  -q, --query TEXT      YouTube me ye text search karo (regex sirf filter bane)
+  -w, --words RANGE     Title me shabdon ki ginti      -w 5-10   -w ">=6"   -w "<=12"
+  -L, --length RANGE    Title ke characters            -L 20-60
+  -d, --duration RANGE  Video ki length                -d 5m-20m   -d ">=1h"   -d "<=90s"
+  -v, --views RANGE     Views                          -v 10k-1m   -v ">=500k"
+  -x, --exclude REGEX   Jis title me ye ho use hata do
+  -n, --new             Sabse naye pehle (sirf normal video search me)
+  -k, --type T          video (default), live, playlist, channel
+  -M, --max-scan N      Normal search me zyada se zyada kitne scan (channel me lagu nahi)
+  -o, --out FILE        Result file me bhi save karo
+  -f, --file FILE       File se searches (har line me ek, # skip)
+      --debug           Asli regex aur command dikhao
+  -h, --help            Ye help
+  RANGE: 5-10, 5..10, ">=5", "<=10", ">5", "<10", 5 (exact). Duration me akela
+  number seconds hota hai. Range ke saath <= / >= likho to quotes me do.
+  -t aur -l saath nahi chalte.
+
+Kai channel ek saath (-C):
+  -C "@a,@b,@c"          comma se (space ke bina, ya poora quotes me)
+  -C @a -C @b            -C baar-baar
+  -C channels.txt        file: har line me ek channel (@handle, URL ya naam),
+                         # wali line skip, "42 @user" jaisi lines bhi chalti hain
+  Mix bhi chalta hai (file + @handle). Channel ek ke baad ek scan hote hain,
+  -c har channel ke liye alag ginta hai, aur har channel ka heading dikhta hai.
+  Koi channel na mile to uska "Failed" aata hai aur baaki chalte rehte hain.
+
+Examples:
+  yt-search "linux"
+  yt-search -c 15 "^how to"
+  yt-search -t -c 15 "^how to"                   (sirf title)
+  yt-search -C @fireship -c 20 "^how to"          (us channel ke saare videos me)
+  yt-search -C "fireship" -c 50 "rust"           (channel ka naam)
+  yt-search -C "@a,@b" -c 10 "^how to"           (do channel, har me 10)
+  yt-search -C channels.txt -c 5 -t "tutorial"   (file ke saare channel, sirf title)
+  yt-search -C @name -c 30                       (search text ke bina, channel ke videos)
+  yt-search -C @name -d ">=20m" -c 10 "tutorial"
+  yt-search -l -c 30 "^how to" -o links.txt
+
+Output:
+   1. How to Boot Linux from USB
+      12:34 | 1.2M views | Channel Name
+      https://www.youtube.com/watch?v=XXXX
+
+  (-t ke saath)
+  How to Boot Linux from USB
+
+Tips:
+  - Channel me normal word (regex nahi) ho to title me wo saare words hone chahiye
+  - Channel me tabs parallel scan hote hain, aur public playlist ke videos Videos tab me hi aate hain
+  - Duration/views khaali (live, premiere) wale result tab hat jaate hain jab uska filter lagao
+  - Zaruri: yt-dlp, python3
+EOF
+        return 0
+    fi
+
+    command -v yt-dlp >/dev/null 2>&1 || { echo "Error: yt-dlp install nahi hai" >&2; return 1; }
+    command -v python3 >/dev/null 2>&1 || { echo "Error: python3 install nahi hai" >&2; return 1; }
+
+    python3 - "$@" <<'PYEOF'
+import sys, os, re, json, subprocess, argparse, urllib.parse, signal, tempfile, threading, queue
+
+for s in (sys.stdout, sys.stderr):
+    try:
+        s.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
+
+def die(msg, code=2):
+    print('Error: ' + str(msg), file=sys.stderr)
+    sys.exit(code)
+
+
+ap = argparse.ArgumentParser(add_help=False, allow_abbrev=False)
+ap.error = lambda msg: die(msg + ' (-h se help dekho)')
+ap.add_argument('queries', nargs='*')
+ap.add_argument('-c', '--count', dest='count', default='10')
+ap.add_argument('-C', '-u', '--channel', dest='channels', action='append', default=[])
+ap.add_argument('-t', '--titles', action='store_true')
+ap.add_argument('-r', '--regex', action='store_true')
+ap.add_argument('-P', '--plain', action='store_true')
+ap.add_argument('-R', '--raw', action='store_true')
+ap.add_argument('-q', '--query', default=None)
+ap.add_argument('-w', '--words', default=None)
+ap.add_argument('-L', '--length', default=None)
+ap.add_argument('-d', '--duration', default=None)
+ap.add_argument('-v', '--views', default=None)
+ap.add_argument('-x', '--exclude', default=None)
+ap.add_argument('-n', '--new', action='store_true')
+ap.add_argument('-k', '--type', default='video')
+ap.add_argument('-M', '--max-scan', dest='max_scan', default=None)
+ap.add_argument('-l', '--links', action='store_true')
+ap.add_argument('-o', '--out', default=None)
+ap.add_argument('-f', '--file', default=None)
+ap.add_argument('--debug', action='store_true')
+A = ap.parse_intermixed_args(sys.argv[1:])
+
+SPECIAL = r'[\^\$\*\[\(\|\\\{]'
+
+if A.titles and A.links:
+    die('-t (sirf title) aur -l (sirf links) saath nahi chalte, ek hi do')
+
+# ---------------- helpers ----------------
+def parse_val(tok, kind):
+    t = tok.strip().lower()
+    if t:
+        if kind == 'int':
+            if re.fullmatch(r'\d+', t):
+                return int(t)
+        elif kind == 'dur':
+            if re.fullmatch(r'\d+(\.\d+)?', t):
+                return float(t)
+            m = re.fullmatch(r'(?:(\d+(?:\.\d+)?)h)?(?:(\d+(?:\.\d+)?)m)?(?:(\d+(?:\.\d+)?)s)?', t)
+            if m:
+                return sum(float(x or 0) * k for x, k in zip(m.groups(), (3600, 60, 1)))
+        else:
+            m = re.fullmatch(r'(\d+(?:\.\d+)?)([kmb]?)', t)
+            if m:
+                return float(m.group(1)) * {'': 1, 'k': 1e3, 'm': 1e6, 'b': 1e9}[m.group(2)]
+    raise ValueError(tok)
+
+
+def parse_range(s, kind, name):
+    if s is None:
+        return None
+    t = s.strip().lower().replace(' ', '')
+    try:
+        m = re.fullmatch(r'(>=|<=|>|<)(.+)', t)
+        if m:
+            v = parse_val(m.group(2), kind)
+            op = m.group(1)
+            if op == '>=': return (v, True, None, True)
+            if op == '>':  return (v, False, None, True)
+            if op == '<=': return (None, True, v, True)
+            return (None, True, v, False)
+        m = re.fullmatch(r'(.*?)(?:\.\.|-|to)(.*)', t)
+        if m and (m.group(1) or m.group(2)):
+            lo = parse_val(m.group(1), kind) if m.group(1) else None
+            hi = parse_val(m.group(2), kind) if m.group(2) else None
+            if lo is not None and hi is not None and lo > hi:
+                die('%s range galat hai (min, max se bada): %s' % (name, s))
+            return (lo, True, hi, True)
+        v = parse_val(t, kind)
+        return (v, True, v, True)
+    except ValueError:
+        die('%s ka format galat hai: %s (jaise 5-10, ">=5", "<=10")' % (name, s))
+
+
+def in_range(x, r):
+    if r is None:
+        return True
+    if x is None:
+        return False
+    lo, loi, hi, hii = r
+    if lo is not None and (x < lo or (x == lo and not loi)):
+        return False
+    if hi is not None and (x > hi or (x == hi and not hii)):
+        return False
+    return True
+
+
+def smart_star(p):
+    out = []
+    quantifiable = False
+    i, n = 0, len(p)
+    while i < n:
+        c = p[i]
+        if c == '\\' and i + 1 < n:
+            out.append(p[i:i + 2]); i += 2; quantifiable = True; continue
+        if c == '[':
+            j = i + 1
+            if j < n and p[j] == '^': j += 1
+            if j < n and p[j] == ']': j += 1
+            while j < n and p[j] != ']':
+                j += 2 if p[j] == '\\' else 1
+            out.append(p[i:j + 1]); i = j + 1; quantifiable = True; continue
+        if c == '*':
+            if quantifiable:
+                out.append('*')
+            elif not (out and out[-1] == '.*'):
+                out.append('.*')
+            quantifiable = False; i += 1; continue
+        if c == '{':
+            j = p.find('}', i)
+            j = n - 1 if j < 0 else j
+            out.append(p[i:j + 1]); i = j + 1; quantifiable = False; continue
+        if c in '+?':
+            out.append(c); quantifiable = False; i += 1; continue
+        out.append(c)
+        quantifiable = c in '.)'
+        i += 1
+    return ''.join(out)
+
+
+def derive_text(p):
+    s = re.sub(r'\((?:[^()]*\|[^()]*)\)', ' ', p)
+    s = re.sub(r'\[(?:\\.|[^\]])*\]', ' ', s)
+    s = re.sub(r'\{[^}]*\}', ' ', s)
+    s = re.sub(r'\\[A-Za-z]', ' ', s)
+    s = re.sub(r'\\(.)', r'\1', s)
+    note = False
+    if '|' in s:
+        s = s.split('|')[0]; note = True
+    s = re.sub(r'[\^\$\*\+\?\.\(\)\|\\]', ' ', s)
+    s = ' '.join(s.split())
+    return s, note
+
+
+def fmt_dur(d):
+    try:
+        d = int(float(d))
+    except (TypeError, ValueError):
+        return ''
+    h, r = divmod(d, 3600)
+    m, s = divmod(r, 60)
+    return '%d:%02d:%02d' % (h, m, s) if h else '%d:%02d' % (m, s)
+
+
+def fmt_views(v):
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return ''
+    for lim, suf in ((1e9, 'B'), (1e6, 'M'), (1e3, 'K')):
+        if v >= lim:
+            x = v / lim
+            return ('%.1f%s' % (x, suf)).replace('.0' + suf, suf) + ' views'
+    return '%d views' % v
+
+
+def num(x):
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return None
+
+
+def entry_url(e, typ):
+    vid = e.get('id') or ''
+    if typ in ('video', 'live'):
+        return 'https://www.youtube.com/watch?v=' + vid
+    u = e.get('webpage_url') or e.get('url') or ''
+    if u.startswith('http'):
+        return u
+    if typ == 'playlist':
+        return 'https://www.youtube.com/playlist?list=' + vid
+    return 'https://www.youtube.com/channel/' + vid
+
+
+def read_list_file(path):
+    items = []
+    with open(path, encoding='utf-8-sig', errors='replace') as fh:
+        for ln in fh:
+            ln = ln.strip()
+            if not ln or ln.startswith('#'):
+                continue
+            m = re.fullmatch(r'\d+\s+(@.+)', ln)
+            if m:
+                ln = m.group(1).strip()
+            items.append(ln)
+    return items
+
+
+# ---------------- validate options ----------------
+try:
+    count = int(A.count)
+    if count < 1:
+        raise ValueError
+except ValueError:
+    die('-c ke liye positive number do')
+if count > 1000:
+    die('-c 1000 se zyada nahi ho sakta')
+
+typ = A.type.lower()
+if typ not in ('video', 'live', 'playlist', 'channel'):
+    die('-k sirf video, live, playlist ya channel ho sakta hai')
+
+# ---- -C: ek channel, kai channel (comma), ya channel ki file ----
+CH_SPECS = []
+for raw in A.channels:
+    raw = raw.strip()
+    if not raw:
+        die('-C ke baad channel ka naam, @handle, URL ya file do')
+    if os.path.isfile(raw):
+        try:
+            items = read_list_file(raw)
+        except OSError as ex:
+            die('channel file nahi padh paaya: %s (%s)' % (raw, ex))
+        if not items:
+            die('channel file khaali hai: ' + raw)
+        CH_SPECS.extend(items)
+    elif (not re.match(r'https?://', raw, re.I)) and raw.lower().endswith(('.txt', '.list', '.csv')):
+        die('channel file nahi mili: ' + raw)
+    else:
+        CH_SPECS.extend(x.strip() for x in raw.split(',') if x.strip())
+_seen_ch = set()
+_tmp = []
+for sp_ in CH_SPECS:
+    k_ = sp_.lower()
+    if k_ not in _seen_ch:
+        _seen_ch.add(k_)
+        _tmp.append(sp_)
+CH_SPECS = _tmp
+if A.channels and not CH_SPECS:
+    die('-C ke baad koi channel nahi mila')
+for sp_ in CH_SPECS:
+    if re.fullmatch(r'\d+', sp_):
+        die('-C ab channel hai. Result ginti ke liye chhota -c use karo (jaise -c %s)' % sp_)
+if CH_SPECS and typ == 'channel':
+    die('-C ke saath -k channel nahi chalta (channel ke andar channel nahi hota)')
+if A.new and (typ != 'video' or CH_SPECS):
+    print('Note: -n sirf normal video search me chalta hai, ignore kiya', file=sys.stderr)
+    A.new = False
+if CH_SPECS and A.max_scan:
+    print('Note: channel search me scan limit nahi hoti, -M ignore kiya', file=sys.stderr)
+
+R_WORDS = parse_range(A.words, 'int', '-w')
+R_LEN = parse_range(A.length, 'int', '-L')
+R_DUR = parse_range(A.duration, 'dur', '-d')
+R_VIEWS = parse_range(A.views, 'num', '-v')
+
+
+def comp(p, name):
+    try:
+        return re.compile(p, re.I | re.U)
+    except re.error as ex:
+        die('%s ka regex galat hai: %s (%s)' % (name, p, ex))
+
+
+RX_EX = comp(A.exclude, '-x') if A.exclude else None
+
+queries = [q.strip() for q in A.queries if q.strip()]
+if A.file:
+    try:
+        with open(A.file, encoding='utf-8', errors='replace') as fh:
+            for ln in fh:
+                ln = ln.strip()
+                if ln and not ln.startswith('#'):
+                    queries.append(ln)
+    except OSError as ex:
+        die('file nahi padh paaya: %s (%s)' % (A.file, ex))
+if not queries:
+    if CH_SPECS:
+        queries = ['']          # channel ke saare videos, koi title filter nahi
+    else:
+        die('koi search nahi diya (-h se help dekho)')
+
+outf = None
+if A.out:
+    try:
+        outf = open(A.out, 'w', encoding='utf-8')
+    except OSError as ex:
+        die('file nahi bana paaya: %s (%s)' % (A.out, ex))
+
+TTY = sys.stderr.isatty()
+state = {'prog': False}
+
+
+def clear_prog():
+    if state['prog']:
+        sys.stderr.write('\r\033[K'); sys.stderr.flush(); state['prog'] = False
+
+
+def out(line):
+    clear_prog()
+    print(line, flush=True)
+    if outf:
+        outf.write(line + '\n'); outf.flush()
+
+
+def kill(p):
+    if p is None:
+        return
+    try:
+        os.killpg(p.pid, signal.SIGTERM)
+    except Exception:
+        pass
+    try:
+        p.wait(timeout=5)
+    except Exception:
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except Exception:
+            pass
+
+
+ENVU = dict(os.environ, PYTHONUNBUFFERED='1')
+BASE_ARGS = ['yt-dlp', '--flat-playlist', '-j', '--no-warnings', '--ignore-errors',
+             '--socket-timeout', '30', '--extractor-retries', '3']
+
+
+def stream_entries(cmds, errs):
+    """Ek ya kai yt-dlp ek saath chalao, jaise hi entry aaye yield karo."""
+    q = queue.Queue()
+    procs = []
+
+    def reader(p):
+        try:
+            for line in p.stdout:
+                line = line.strip()
+                if line.startswith('{'):
+                    try:
+                        q.put(json.loads(line))
+                    except ValueError:
+                        pass
+        except Exception:
+            pass
+        finally:
+            q.put(None)
+
+    try:
+        for cmd in cmds:
+            ef = tempfile.TemporaryFile('w+')
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=ef, stdin=subprocess.DEVNULL,
+                                 text=True, encoding='utf-8', errors='replace', env=ENVU,
+                                 start_new_session=True)
+            procs.append((p, ef))
+            threading.Thread(target=reader, args=(p,), daemon=True).start()
+        live = len(procs)
+        while live:
+            try:
+                e = q.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            if e is None:
+                live -= 1
+                continue
+            yield e
+    finally:
+        for p, _ in procs:
+            kill(p)
+        for p, ef in procs:
+            try:
+                ef.seek(0)
+                errs.extend(l.strip() for l in ef.read().splitlines() if 'ERROR' in l)
+            except Exception:
+                pass
+            try:
+                ef.close()
+            except Exception:
+                pass
+
+
+# ---------------- channel resolve ----------------
+CHAN_RE = re.compile(r'^(https?://(?:www\.|m\.)?youtube\.com/(?:@[^/?#]+|channel/[^/?#]+|c/[^/?#]+|user/[^/?#]+))', re.I)
+
+
+class ChanErr(Exception):
+    pass
+
+
+def resolve_channel(spec):
+    m = CHAN_RE.match(spec)
+    if m:
+        u = m.group(1)
+        return {'url': u, 'name': urllib.parse.unquote(u.rsplit('/', 1)[-1])}
+    if re.fullmatch(r'@[\w.\-]+', spec):
+        return {'url': 'https://www.youtube.com/' + spec, 'name': spec}
+    looks_re = bool(re.search(SPECIAL, spec))
+    text = derive_text(spec)[0] if looks_re else spec
+    if not text:
+        raise ChanErr('%s (channel ka naam nahi ban paaya, @handle ya URL do)' % spec)
+    try:
+        rx = re.compile(spec if looks_re else re.escape(spec), re.I | re.U)
+    except re.error as ex:
+        raise ChanErr('%s (regex galat hai: %s)' % (spec, ex))
+    url = 'https://www.youtube.com/results?search_query=%s&sp=EgIQAg%%3D%%3D' % urllib.parse.quote_plus(text)
+    cmd = BASE_ARGS + ['--playlist-end', '10', '--', url]
+    cands = []
+    errs = []
+    for e in stream_entries([cmd], errs):
+        u = e.get('channel_url') or e.get('url') or ''
+        if not u.startswith('http'):
+            u = 'https://www.youtube.com/channel/' + (e.get('id') or '')
+        title = (e.get('title') or e.get('channel') or '').strip()
+        if e.get('id') and title:
+            cands.append({'url': u, 'name': title, 'handle': (e.get('uploader_id') or '')})
+        if len(cands) >= 10:
+            break
+    if not cands:
+        raise ChanErr('%s (channel nahi mila%s)' % (spec, (': ' + errs[-1][:100]) if errs else ''))
+    want = spec.lstrip('@').strip().lower()
+    pick = None
+    for c in cands:
+        if want in (c['name'].lower(), c['handle'].lstrip('@').lower()):
+            pick = c; break
+    if pick is None:
+        for c in cands:
+            if rx.search(c['name']) or rx.search(c['handle']):
+                pick = c; break
+    if pick is None:
+        names = ', '.join('%s (%s)' % (c['name'], c['url']) for c in cands[:3])
+        raise ChanErr('%s (match karta channel nahi mila. Mile: %s. @handle ya URL do)' % (spec, names))
+    pick['others'] = [c['name'] for c in cands if c is not pick and (rx.search(c['name']) or want in c['name'].lower())][:3]
+    return pick
+
+
+# ---------------- duration/views ki alag jaankari (jahan list me nahi hoti) ----------------
+META = {}
+
+
+def get_meta(vid):
+    if vid in META:
+        return META[vid]
+    res = (None, None)
+    url = 'https://www.youtube.com/watch?v=' + vid
+    for extra in (['--extractor-args', 'youtube:player_client=android_vr;player_skip=webpage,configs'], []):
+        cmd = ['yt-dlp', '--skip-download', '--no-warnings', '--ignore-no-formats-error', '--no-playlist',
+               '--socket-timeout', '20'] + extra + ['--print', '%(duration)s\t%(view_count)s', '--', url]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace',
+                               stdin=subprocess.DEVNULL, timeout=45)
+            line = (r.stdout.strip().splitlines() or [''])[0]
+            parts = line.split('\t')
+            if len(parts) >= 2:
+                res = (num(parts[0]), num(parts[1]))
+                if res[0] is not None or res[1] is not None:
+                    break
+        except subprocess.TimeoutExpired:
+            pass
+    META[vid] = res
+    return res
+
+
+CACHE = {}
+
+
+def run_query(q, CH):
+    chan_mode = CH is not None
+    if A.plain:
+        is_re = False
+    elif A.regex:
+        is_re = True
+    else:
+        is_re = bool(q) and bool(re.search(SPECIAL, q))
+    rx = None
+    words = []
+    final = None
+    text = ''
+    if is_re:
+        final = q if A.raw else smart_star(q)
+        rx = comp(final, 'search')
+        if not chan_mode:
+            text, alt = derive_text(q)
+            if A.query:
+                text = A.query.strip()
+            elif alt:
+                print('Note: regex me | hai, search text sirf pehle hisse se bana ("%s"). Poore ke liye -q do.' % text, file=sys.stderr)
+            if not text:
+                print('Failed: "%s" se search text nahi ban paaya, -q "text" do' % q, file=sys.stderr)
+                return 0, False
+    else:
+        if chan_mode:
+            words = [w.lower() for w in q.split()]
+        else:
+            text = A.query.strip() if A.query else q
+
+    if chan_mode and A.query:
+        print('Note: channel search me -q ignore kiya (poora channel scan hota hai)', file=sys.stderr)
+
+    cap = 0
+    if chan_mode:
+        tabs = {'video': ['videos', 'shorts', 'streams'], 'live': ['streams'], 'playlist': ['playlists']}[typ]
+        cmds = [BASE_ARGS + ['--', CH['url'].rstrip('/') + '/' + t] for t in tabs]
+        info = ['Search : ' + (q if q else '(sab videos)')]
+        if is_re:
+            info.append('Filter : regex ' + final + ' (case-insensitive)')
+        elif words:
+            info.append('Filter : title me ye sab shabd: ' + ' '.join(words))
+        info.append('Scan   : poora channel (%s), koi limit nahi' % ', '.join(tabs))
+    else:
+        cap = int(A.max_scan) if A.max_scan else max(500, count * 20)
+        cap = max(count, min(cap, 5000))
+        if typ == 'video':
+            target = '%s%d:%s' % ('ytsearchdate' if A.new else 'ytsearch', cap, text)
+            extra = []
+        else:
+            sp = {'playlist': 'EgIQAw%3D%3D', 'channel': 'EgIQAg%3D%3D', 'live': 'EgJAAQ%3D%3D'}[typ]
+            target = 'https://www.youtube.com/results?search_query=%s&sp=%s' % (urllib.parse.quote_plus(text), sp)
+            extra = ['--playlist-end', str(cap)]
+        cmds = [BASE_ARGS + extra + ['--', target]]
+        info = ['Search : ' + text]
+        if is_re:
+            info.append('Filter : regex ' + final + ' (case-insensitive)')
+    for lab, val in (('Words', A.words), ('Length', A.length), ('Duration', A.duration),
+                     ('Views', A.views), ('Exclude', A.exclude)):
+        if val:
+            info.append('%-7s: %s' % (lab, val))
+    info.append('Dikhane: %d%s%s' % (count, '' if chan_mode else ' | max scan: %d' % cap, ' | naye pehle' if A.new else ''))
+    for ln in info:
+        print(ln, file=sys.stderr)
+    if A.debug:
+        for c in cmds:
+            print('CMD    : ' + ' '.join(c), file=sys.stderr)
+    if len(queries) > 1 and not A.links and not A.titles:
+        out('===== %s =====' % (q or '(sab videos)'))
+
+    errs = []
+    found = scanned = 0
+    seen = set()
+    interrupted = False
+    gen = None
+    need_meta = (R_DUR is not None or R_VIEWS is not None)
+
+    key = (CH['url'], tuple(cmds[i][-1] for i in range(len(cmds)))) if chan_mode else None
+    cached = CACHE.get(key) if key else None
+    if cached is not None:
+        src = iter(cached)
+    else:
+        gen = stream_entries(cmds, errs)
+        if chan_mode and len(queries) > 1:
+            rec = []
+
+            def recording():
+                for e in gen:
+                    rec.append(e)
+                    yield e
+                CACHE[key] = rec
+            src = recording()
+        else:
+            src = gen
+
+    try:
+        for e in src:
+            vid = e.get('id')
+            title = (e.get('title') or '').replace('\n', ' ').strip()
+            if not vid or vid in seen:
+                continue
+            seen.add(vid)
+            scanned += 1
+            if TTY and scanned % 10 == 0:
+                sys.stderr.write('\r  scan: %d | mile: %d/%d ' % (scanned, found, count)); sys.stderr.flush()
+                state['prog'] = True
+            if not title:
+                continue
+            if rx is not None and not rx.search(title):
+                continue
+            if words:
+                tl = title.lower()
+                if not all(w in tl for w in words):
+                    continue
+            if RX_EX is not None and RX_EX.search(title):
+                continue
+            if not in_range(len(title.split()), R_WORDS) or not in_range(len(title), R_LEN):
+                continue
+            dur, views = num(e.get('duration')), num(e.get('view_count'))
+            if need_meta and typ in ('video', 'live') and ((R_DUR is not None and dur is None) or (R_VIEWS is not None and views is None)):
+                md, mv = get_meta(vid)
+                if dur is None: dur = md
+                if views is None: views = mv
+            if R_DUR is not None and not in_range(dur, R_DUR):
+                continue
+            if R_VIEWS is not None and not in_range(views, R_VIEWS):
+                continue
+            chan = e.get('channel') or e.get('uploader') or (CH['name'] if chan_mode else '')
+            found += 1
+            url = entry_url(e, typ)
+            if A.links:
+                out(url)
+            elif A.titles:
+                out(title)
+            else:
+                parts = [x for x in (fmt_dur(dur), fmt_views(views), chan) if x]
+                if e.get('live_status') == 'is_live':
+                    parts.insert(0, 'LIVE')
+                out('%3d. %s' % (found, title))
+                if parts:
+                    out('     ' + ' | '.join(parts))
+                out('     ' + url)
+                out('')
+            if found >= count:
+                break
+    except KeyboardInterrupt:
+        interrupted = True
+    finally:
+        if gen is not None:
+            try:
+                gen.close()
+            except Exception:
+                pass
+        clear_prog()
+
+    if interrupted:
+        print('Roka gaya. %d result mile (%d scan kiye).' % (found, scanned), file=sys.stderr)
+    elif scanned == 0 and errs:
+        print('Failed: search nahi ho paaya (%s)' % errs[-1][:150], file=sys.stderr)
+    elif found >= count:
+        print('Done: %d result mile (%d scan kiye).' % (found, scanned), file=sys.stderr)
+    elif chan_mode:
+        print('Sirf %d result mile. Channel ke saare %d videos scan ho gaye, itne hi match hue. Filter dheela karo.'
+              % (found, scanned), file=sys.stderr)
+    else:
+        why = ('scan limit (%d) poori ho gayi, -M se badhao' % cap) if scanned >= cap \
+            else 'YouTube ne itne hi result diye'
+        print('Sirf %d result mile (%d scan kiye, %s). Aur chahiye to filter dheela karo.'
+              % (found, scanned, why), file=sys.stderr)
+    return found, interrupted
+
+
+total_ok = True
+code = 0
+grand = 0
+chan_fail = 0
+chan_done = 0
+try:
+    if CH_SPECS:
+        multi = len(CH_SPECS) > 1
+        stop = False
+        first = True
+        for spec in CH_SPECS:
+            if stop:
+                break
+            CACHE.clear()
+            if not first:
+                print('', file=sys.stderr)
+            first = False
+            try:
+                ch = resolve_channel(spec)
+            except ChanErr as ex:
+                print('Failed: %s' % ex, file=sys.stderr)
+                chan_fail += 1
+                total_ok = False
+                continue
+            except KeyboardInterrupt:
+                code = 130
+                break
+            chan_done += 1
+            print('Channel: %s  (%s)' % (ch['name'], ch['url']), file=sys.stderr)
+            if ch.get('others'):
+                print('Note: aur milte-julte channel bhi hain: %s. Pakka channel chahiye to @handle do.' % ', '.join(ch['others']), file=sys.stderr)
+            if multi and not A.links and not A.titles:
+                out('##### Channel: %s #####' % ch['name'])
+            for qi, q in enumerate(queries):
+                if qi:
+                    print('', file=sys.stderr)
+                f, intr = run_query(q, ch)
+                grand += f
+                if intr:
+                    code = 130
+                    stop = True
+                    break
+                if f == 0:
+                    total_ok = False
+    else:
+        for qi, q in enumerate(queries):
+            if qi:
+                print('', file=sys.stderr)
+            f, intr = run_query(q, None)
+            grand += f
+            if intr:
+                code = 130
+                break
+            if f == 0:
+                total_ok = False
+finally:
+    if outf:
+        outf.close()
+        print('Saved: ' + A.out, file=sys.stderr)
+if len(CH_SPECS) > 1:
+    print('\nKul: %d channel scan hue, %d fail, total %d result.' % (chan_done, chan_fail, grand), file=sys.stderr)
+sys.exit(code if code else (0 if total_ok else 1))
+PYEOF
+}
+
+
+
+
+
+
+
 
 
 #yt-list

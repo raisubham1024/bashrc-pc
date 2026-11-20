@@ -5,6 +5,7 @@
 #|                                      |
 #+--------------------------------------+
 #bashrc-search	Alias/function kis file mein hai, ye batata hai.
+#qr             QR code generate in terminal 
 #mkdirg		Create and go to the directory
 #cpp		Copy file with a progress bar
 #cpg		Copy and go to the directory
@@ -12,8 +13,7 @@
 #big		kisi bhee location k folder and unka size kitna hai janney k liyey. #default hidden file ka nhi show krega, '-h' use mai laan hoga for hidden files/folders
 
 
-
-#bashrc-search
+#bashrc-search : Alias/function kis file mein hai, ye batata hai.
 bashrc-search() {
     if [ -z "$1" ]; then
         echo "bashrc-search: alias/function kis file mein hai ye batata hai"
@@ -25,14 +25,32 @@ bashrc-search() {
 }
 
 
-#mkdirg
+
+
+
+
+#qr : QR code generate in terminal 
+qr() {
+    qrencode -t ansiutf8 "$*"
+}
+
+
+
+
+
+
+#mkdirg	: Create and go to the directory
 mkdirg() {
 	mkdir -p "$1"
 	cd "$1"
 }
 
 
-#cpp
+
+
+
+
+#cpp : Copy file with a progress bar
 cpp() {
     set -e
     strace -q -ewrite cp -- "${1}" "${2}" 2>&1 |
@@ -53,7 +71,11 @@ cpp() {
 }
 
 
-#cpg
+
+
+
+
+#cpg : Copy and go to the directory
 cpg() {
 	if [ -d "$2" ]; then
 		cp "$1" "$2" && cd "$2"
@@ -63,7 +85,11 @@ cpg() {
 }
 
 
-#mvg
+
+
+
+
+#mvg : Move and go to the directory
 mvg() {
 	if [ -d "$2" ]; then
 		mv "$1" "$2" && cd "$2"
@@ -73,7 +99,11 @@ mvg() {
 }
 
 
-#big
+
+
+
+
+#big : kisi bhee location k folder and unka size kitna hai janney k liyey. #default hidden file ka nhi show krega, '-h' use mai laan hoga for hidden files/folders
 big() {
     dir="."
     [ "$1" = "-h" ] && { hidden=1; shift; }
@@ -87,7 +117,11 @@ big() {
 }
 
 
-#color
+
+
+
+
+#color : $(tput setaf 1) Hello world` to yaha prr 1 se lekr 200 tk jo different color use hongey unko show krega
 color() {
     for i in {1..200}; do
         echo "$(tput setaf $i)$i -> Hello world$(tput sgr0)"
@@ -95,12 +129,20 @@ color() {
 }
 
 
+
+
+
+
+
+
+
+
 #+--------------------------------------+
 #|                                      |
 #|                BACKUP                |
 #|                                      |
 #+--------------------------------------+
-#backup			To run the all backup script (All in one backup)
+#backup : To run the all backup script (All in one backup)
 
 backup () (				
     
@@ -118,15 +160,22 @@ cd "$HOME/Templates/backup script/" || return
 
 
 
+
+
+
+
+
+
+
 #+--------------------------------------+
 #|                                      |
 #|              clipboard               |
 #|                                      |
 #+--------------------------------------+
-#copy		copyin file data directly to Gpaste clipboard + Advance functionality 1)multiple file se extract ho kr ek single banana 2) ya ek-ek kr k Gpaste mai add
+#copy : copyin file data directly to Gpaste clipboard + Advance functionality 1)multiple file se extract ho kr ek single banana 2) ya ek-ek kr k Gpaste mai add
 
 
-#copy
+#copy : copyin file data directly to Gpaste clipboard + Advance functionality 1)multiple file se extract ho kr ek single banana 2) ya ek-ek kr k Gpaste mai add
 copy() {
     [[ $# -eq 0 ]] && { echo "Usage: copy <file1> [file2] ..."; return 1; }
 
@@ -163,6 +212,10 @@ copy() {
 }
 
 
+
+
+
+
 #+--------------------------------------+
 #|                                      |
 #|                 rust                 |
@@ -172,10 +225,12 @@ copy() {
 
 
 
-#cargof
+#cargof : to fastly compile rust code
 cargof() {
     command cargo "${@:1:1}" --jobs $(nproc) "${@:2}"
 }
+
+
 
 
 
