@@ -5,12 +5,15 @@
 #|                                      |
 #+--------------------------------------+
 #bashrc-search	Alias/function kis file mein hai, ye batata hai.
+#whatis		whatis = my cutom whatis + inbuilt whatis command, check alias and function description in  all .bashrc-*
+
 #qr             QR code generate in terminal 
 #mkdirg		Create and go to the directory
 #cpp		Copy file with a progress bar
 #cpg		Copy and go to the directory
 #mvg		Move and go to the directory
 #big		kisi bhee location k folder and unka size kitna hai janney k liyey. #default hidden file ka nhi show krega, '-h' use mai laan hoga for hidden files/folders
+#color		`$(tput setaf 1) Hello world` to yaha prr 1 se lekr 200 tk jo different color use hongey unko show krega
 
 
 #bashrc-search : Alias/function kis file mein hai, ye batata hai.
@@ -23,6 +26,112 @@ bashrc-search() {
     fi
     grep -rlE "^\s*(alias $1=|function $1\b|$1\s*\(\))" ~/.bashrc-pc/
 }
+
+
+
+
+
+
+#whatis = my cutom whatis + inbuilt whatis command, check alias and function description in  all .bashrc-*
+# ---------------------------------------------------------------
+# whatis: manual (man database) + your own #name description lines
+#
+#   whatis rec
+#
+# 1) looks in your bashrc files for a comment like
+#        #rec    Record a terminal session
+#        #rec  :  Record a terminal session
+#        #rec  -  Record a terminal session
+#    (symbols between the name and the description are ignored; lines with
+#    no description after the name are skipped; if the same name appears
+#    many times, the first one that has a description wins)
+# 2) if it is a function/alias of yours with no description comment,
+#    says so
+# 3) also shows what the real `whatis` (man pages) says
+# ---------------------------------------------------------------
+WHATIS_DIRS=("$HOME/.bashrc-pc" "$HOME/.bashrc")   # where to look
+
+whatis() {
+    if [ $# -eq 0 ]; then
+        echo "whatis: command/alias/function ka description batata hai"
+        echo "Use: whatis <naam> [naam ...]"
+        echo "Example: whatis rec"
+        return 1
+    fi
+
+    # options (eg. -r, -w) go straight to the real whatis
+    if [[ "$1" == -* ]]; then
+        command whatis "$@"
+        return
+    fi
+
+    local name f file out first=1 rc=0
+
+    for name in "$@"; do
+        [ $first -eq 1 ] || echo
+        first=0
+
+        local found=0 desc="" descfile=""
+
+        # ---- 1) description from "#name   description" comment lines
+        while IFS= read -r -d '' f; do
+            desc=$(awk -v n="$name" '
+                {
+                    line = $0
+                    sub(/^[ \t]*#[ \t]*/, "", line)
+                    if (index(line, n) != 1) next
+                    rest = substr(line, length(n) + 1)
+                    # the name must end here (not "#record" for "rec")
+                    if (rest ~ /^[A-Za-z0-9_.\/-]/) next
+                    # drop spaces and separator symbols before the description
+                    while (match(rest, /^([ \t]|:|-|=|>|\||~|\*|\.|#|–|—|→)+/))
+                        rest = substr(rest, RLENGTH + 1)
+                    sub(/[ \t\r]+$/, "", rest)
+                    if (rest == "") next          # blank description: skip
+                    print rest
+                    exit
+                }' "$f" 2>/dev/null)
+            if [ -n "$desc" ]; then
+                descfile="$f"
+                break
+            fi
+        done < <(find -L "${WHATIS_DIRS[@]}" -type f -print0 2>/dev/null)
+
+        if [ -n "$desc" ]; then
+            echo "$name - $desc"
+            found=1
+        fi
+
+        # ---- 2) is it an alias / function of yours (without a description)?
+        local esc
+        esc=$(printf '%s' "$name" | sed 's/[][\.*^$+?(){}|\/]/\\&/g')
+        file=$(grep -rIlE "^[[:space:]]*(alias $esc=|function $esc([^A-Za-z0-9_]|\$)|$esc[[:space:]]*\(\))" \
+                "${WHATIS_DIRS[@]}" 2>/dev/null)
+        if [ -z "$desc" ] && [ -n "$file" ]; then
+            echo "$name - (no description comment found)"
+            found=1
+        fi
+
+        # ---- 3) the real whatis (man pages)
+        out=$(command whatis "$name" 2>/dev/null)
+        if [ $? -eq 0 ] && [ -n "$out" ] && [[ "$out" != *"nothing appropriate"* ]]; then
+            [ $found -eq 1 ] && echo "  man:"
+            echo "$out" | sed 's/^/  /;'
+            found=1
+        fi
+
+        if [ $found -eq 0 ]; then
+            echo "$name: nothing appropriate."
+            rc=1
+        fi
+    done
+
+    return $rc
+}
+
+
+
+
 
 
 
