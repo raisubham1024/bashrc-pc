@@ -330,11 +330,11 @@ copy() {
 #|                 rust                 |
 #|                                      |
 #+--------------------------------------+
-#cargof		to fastly compile rust code		#syntax : cargof build --release  OR  cargof build
+#cargof		runs the Rust build tool "cargo" using every processor core your computer has, so builds finish faster.		#syntax : cargof build --release  OR  cargof build
 
 
 
-#cargof : to fastly compile rust code
+#cargof : runs the Rust build tool "cargo" using every processor core your computer has, so builds finish faster.
 cargof() {
     command cargo "${@:1:1}" --jobs $(nproc) "${@:2}"
 }

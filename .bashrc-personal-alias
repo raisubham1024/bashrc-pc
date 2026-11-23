@@ -4,7 +4,9 @@
 #|                                      |
 #+--------------------------------------+
 
+
 alias btop="btop --utf-force"
+alias bat="batcat"
 
 alias c="clear"
 alias cdb="cd ~/.local/share/bmm"		#bmm location
@@ -129,21 +131,21 @@ alias logs="sudo find /var/log -type f -exec file {} \; | grep 'text' | cut -d' 
 #|                                      |
 #+--------------------------------------+
 
-alias lsa='ls -Alh'				#show hidden files
-alias lsh="ls -a | grep '^\.' --color=never"	#hidden file only
-alias ls='ls -Fh --color=always'		#show color and file (not hidden) type extension
-alias lsa='ls -aFh --color=always'		#show color and file (including hidden) type extension
-alias lsx='ls -lXBh'				#sort by extension
-alias lss='ls -lSrh'				#sort by size
-alias lsct='ls -ltcrh'				#sort by change time
-alias lsat='ls -lturh'				#sort by access time
-alias lsr='ls -lRh'				#recursie ls
-alias lsd='ls -ltrh'				#sort by date
-alias lsm='ls -alh | more'			#pipe through 'more'
-alias lsw='ls -xAh'				#wide listing format
-alias lsabc='ls -lap'				#alphabetical sort
-alias lsf="ls -l | grep -v '^d'"		#files only
-alias lsdir="ls -l | grep '^d' --color=never"	#directory only		#(or better) compgen -d | sort
+alias ls='ls -Fh --color=always --hyperlink=auto'       #show color and file (not hidden) type extension
+alias lsa='ls -Alh'					#show hidden files
+alias lsh="ls -a | grep '^\.' --color=never"		#hidden file only
+alias lsa='ls -aFh --color=always'			#show color and file (including hidden) type extension
+alias lsx='ls -lXBh'					#sort by extension
+alias lss='ls -lSrh'					#sort by size
+alias lsct='ls -ltcrh'					#sort by change time
+alias lsat='ls -lturh'					#sort by access time
+alias lsr='ls -lRh'					#recursie ls
+alias lsd='ls -ltrh'					#sort by date
+alias lsm='ls -alh | more'				#pipe through 'more'
+alias lsw='ls -xAh'					#wide listing format
+alias lsabc='ls -lap'					#alphabetical sort
+alias lsf="ls -l | grep -v '^d'"			#files only
+alias lsdir="ls -l | grep '^d' --color=never"		#directory only		#(or better) compgen -d | sort
 
 
 
