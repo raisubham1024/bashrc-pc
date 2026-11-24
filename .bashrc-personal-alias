@@ -11,6 +11,11 @@ alias bat="batcat"
 alias c="clear"
 alias cdb="cd ~/.local/share/bmm"		#bmm location
 
+alias cdy="cd ~/Desktop/testing/youtube"
+
+
+
+
 alias ek="nano ~/.config/kitty/kitty.conf"
 
 alias format="cat msg.txt | sed '2,$ s/^/>/g'"	#obsidian nested callout formatter
@@ -18,7 +23,6 @@ alias F=elio					#TUI based File manager
 
 alias gc="git fetch origin && git diff HEAD origin/main"	#current github repo mai koi changes huey hai kya ye pta krney k liyey	#ydi find hua to gitpull
 
-alias hash="sed 's/^/#/g'"
 alias h='history'
 alias hc='history -c'
 
