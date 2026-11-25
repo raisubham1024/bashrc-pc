@@ -139,10 +139,24 @@ whatis() {
 
 
 #qr : QR code generate in terminal 
-qr() {
-    qrencode -t ansiutf8 "$*"
+qr () 
+{ 
+    case "$1" in
+        -*)
+            # Power mode: aapke diye saare flags seedha qrencode ko
+            command qrencode "$@"
+            ;;
+        *)
+            if [ -r "$1" ]; then
+                # File hai → content QR mein
+                command qrencode -t ansiutf8 "$(cat "$@")"
+            else
+                # File nahi hai → literal text QR mein
+                command qrencode -t ansiutf8 "$*"
+            fi
+            ;;
+    esac
 }
-
 
 
 
